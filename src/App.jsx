@@ -264,6 +264,8 @@ export default function App(){
   const [adminTab,setAdminTab]=useState("live");
   const [editEmp,setEditEmp]=useState(null);
   const [editEmpForm,setEditEmpForm]=useState({});
+  const [addManual,setAddManual]=useState(false);
+  const [manualForm,setManualForm]=useState({empId:'',type:'in',time:''});
   const [filterDate,setFilterDate]=useState(dateKey());
   const [editRecId,setEditRecId]=useState(null);
   const [editTimeVal,setEditTimeVal]=useState("");
@@ -410,15 +412,74 @@ export default function App(){
 
       {/* RECORDS */}
       {adminTab==="records"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
-        <div style={{display:"flex",gap:8}}><button onClick={()=>{const d=new Date(filterDate);d.setDate(d.getDate()-1);setFilterDate(dateKey(d));}} style={{...ss.btn(C.card,C.muted),width:44,border:`1px solid ${C.border}`}}>←</button><input type="date" value={filterDate} onChange={e=>setFilterDate(e.target.value)} style={{...ss.input,flex:1}}/><button onClick={()=>{const d=new Date(filterDate);d.setDate(d.getDate()+1);setFilterDate(dateKey(d));}} style={{...ss.btn(C.card,C.muted),width:44,border:`1px solid ${C.border}`}}>→</button></div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{employees.filter(e=>e.active).map(emp=>{const w=getWorked(records,emp.id,filterDate);if(!w&&!(records[filterDate]||[]).some(r=>r.empId===emp.id))return null;return<div key={emp.id} style={{...ss.card,padding:"5px 10px",fontFamily:font,fontSize:11}}>{emp.name.split(" ")[0]} <span style={{color:C.accent,marginLeft:4}}>{fmtDur(w)}</span></div>;})}</div>
-        {(records[filterDate]||[]).sort((a,b)=>a.time-b.time).map(r=>{const emp=employees.find(e=>e.id===r.empId);return(<div key={r.id} style={{...ss.card,padding:10,display:"flex",flexDirection:"column",gap:6}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,fontFamily:font,fontSize:12}}><span style={{color:C.accent,minWidth:44}}>{fmtTime(r.time)}</span><span style={{flex:1}}>{emp?.name?.split(" ")[0]}</span><span style={{color:r.type==="in"?C.green:C.red,fontSize:11}}>{r.type==="in"?"Entrada":"Salida"}</span>
-          <button onClick={()=>{setEditRecId(editRecId===r.id?null:r.id);setEditTimeVal("");}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:12}}>✎</button>
-          <button onClick={async()=>{await DB.deleteClockIn(r.id);setRecords({...records,[filterDate]:(records[filterDate]||[]).filter(x=>x.id!==r.id)});flash("Eliminado");}} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontSize:12}}>✕</button></div>
-          {r.photo&&<img src={r.photo} alt="" style={{width:"100%",maxHeight:80,objectFit:"cover",borderRadius:8}}/>}
-          {editRecId===r.id&&<div style={{display:"flex",gap:6}}><input type="time" value={editTimeVal} onChange={e=>setEditTimeVal(e.target.value)} style={{...ss.input,flex:1}}/><button onClick={async()=>{if(!editTimeVal)return;const[h,m]=editTimeVal.split(":");const d=new Date(r.time);d.setHours(+h,+m,0);await DB.updateClockIn(r.id,d.getTime());setRecords({...records,[filterDate]:(records[filterDate]||[]).map(x=>{if(x.id!==r.id)return x;return{...x,time:d.getTime()};})});setEditRecId(null);flash("Actualizado");}} style={{background:C.accent,border:"none",color:"#000",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontFamily:font,fontSize:11,fontWeight:700}}>✓</button></div>}
-        </div>);})}
+        {/* Date nav */}
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>{const d=new Date(filterDate);d.setDate(d.getDate()-1);setFilterDate(dateKey(d));}} style={{...ss.btn(C.card,C.muted),width:44,border:`1px solid ${C.border}`}}>←</button>
+          <input type="date" value={filterDate} onChange={e=>setFilterDate(e.target.value)} style={{...ss.input,flex:1}}/>
+          <button onClick={()=>{const d=new Date(filterDate);d.setDate(d.getDate()+1);setFilterDate(dateKey(d));}} style={{...ss.btn(C.card,C.muted),width:44,border:`1px solid ${C.border}`}}>→</button>
+          <button onClick={()=>setAddManual(!addManual)} style={{...ss.btn(addManual?C.accent:C.card,addManual?"#fff":C.muted),width:44,border:`1px solid ${C.border}`,fontSize:18}}>+</button>
+        </div>
+
+        {/* Manual fichaje form */}
+        {addManual&&<div style={{...ss.card,border:`1px solid ${C.accent}`,display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{fontFamily:font,fontSize:11,fontWeight:700,color:C.accent}}>Añadir fichaje manual</div>
+          <select value={manualForm.empId} onChange={e=>setManualForm({...manualForm,empId:e.target.value})} style={ss.input}>
+            <option value="">Selecciona trabajador...</option>
+            {employees.filter(e=>e.active).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+          <div style={{display:"flex",gap:8}}>
+            <select value={manualForm.type} onChange={e=>setManualForm({...manualForm,type:e.target.value})} style={{...ss.input,flex:1}}>
+              <option value="in">Entrada</option>
+              <option value="out">Salida</option>
+            </select>
+            <input type="time" value={manualForm.time} onChange={e=>setManualForm({...manualForm,time:e.target.value})} style={{...ss.input,flex:1}}/>
+          </div>
+          <button onClick={async()=>{
+            if(!manualForm.empId||!manualForm.time)return flash("Selecciona trabajador y hora",false);
+            const[h,m]=manualForm.time.split(":");
+            const d=new Date(filterDate);d.setHours(+h,+m,0,0);
+            const rec={empId:manualForm.empId,type:manualForm.type,time:d.getTime(),photo:null};
+            await DB.addClockIn(rec);
+            await loadData();
+            setAddManual(false);
+            setManualForm({empId:'',type:'in',time:''});
+            flash("Fichaje añadido");
+          }} style={ss.btn(C.accent,"#fff")}>Guardar fichaje</button>
+        </div>}
+
+        {/* Per-employee view: one card per person showing entry/exit pair and total */}
+        {employees.filter(e=>e.active&&(records[filterDate]||[]).some(r=>r.empId===e.id)).map(emp=>{
+          const empRecs=(records[filterDate]||[]).filter(r=>r.empId===emp.id).sort((a,b)=>a.time-b.time);
+          const w=getWorked(records,emp.id,filterDate);
+          const col=getAvatarColor(emp.id);
+          return(<div key={emp.id} style={{...ss.card,padding:12,display:"flex",flexDirection:"column",gap:8}}>
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={ss.avatar(col,34)}>{emp.name[0]}</div>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:font,fontSize:13,fontWeight:700}}>{emp.name.split(" ")[0]}</div>
+                <div style={{fontFamily:font,fontSize:10,color:C.muted}}>{emp.position||""}</div>
+              </div>
+              <div style={{fontFamily:font,fontSize:14,fontWeight:700,color:C.accent}}>{fmtDur(w)}</div>
+            </div>
+            {/* Fichajes */}
+            <div style={{display:"flex",flexDirection:"column",gap:4,borderTop:`1px solid ${C.border}`,paddingTop:8}}>
+              {empRecs.map(r=>(
+                <div key={r.id} style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontFamily:font,fontSize:11,fontWeight:700,color:r.type==="in"?C.green:C.red,minWidth:16}}>{r.type==="in"?"↑":"↓"}</span>
+                  <span style={{fontFamily:font,fontSize:12,color:C.accent,minWidth:44}}>{fmtTime(r.time)}</span>
+                  <span style={{fontFamily:font,fontSize:11,color:C.muted,flex:1}}>{r.type==="in"?"Entrada":"Salida"}</span>
+                  <button onClick={()=>{setEditRecId(editRecId===r.id?null:r.id);setEditTimeVal("");}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:12}}>✎</button>
+                  <button onClick={async()=>{await DB.deleteClockIn(r.id);setRecords({...records,[filterDate]:(records[filterDate]||[]).filter(x=>x.id!==r.id)});flash("Eliminado");}} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontSize:12}}>✕</button>
+                </div>
+              ))}
+              {editRecId&&empRecs.some(r=>r.id===editRecId)&&<div style={{display:"flex",gap:6,marginTop:4}}>
+                <input type="time" value={editTimeVal} onChange={e=>setEditTimeVal(e.target.value)} style={{...ss.input,flex:1}}/>
+                <button onClick={async()=>{if(!editTimeVal)return;const[h,m]=editTimeVal.split(":");const r=empRecs.find(x=>x.id===editRecId);const d=new Date(r.time);d.setHours(+h,+m,0);await DB.updateClockIn(editRecId,d.getTime());setRecords({...records,[filterDate]:(records[filterDate]||[]).map(x=>x.id!==editRecId?x:{...x,time:d.getTime()})});setEditRecId(null);flash("Actualizado");}} style={{background:C.accent,border:"none",color:"#fff",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontFamily:font,fontSize:11,fontWeight:700}}>✓</button>
+              </div>}
+            </div>
+          </div>);
+        })}
         {!(records[filterDate]||[]).length&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin registros</div>}
       </div>}
 
