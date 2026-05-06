@@ -25,7 +25,7 @@ const DB = {
   async getAnnouncements() { const {data}=await sb.from('areso_announcements').select('*').order('date',{ascending:false}); return (data||[]).map(a=>({id:a.id,title:a.title,body:a.body,date:new Date(a.date).getTime(),readBy:a.read_by||[]})); },
   async addAnnouncement(ann) { await sb.from('areso_announcements').insert({title:ann.title,body:ann.body}); },
   async deleteAnnouncement(id) { await sb.from('areso_announcements').delete().eq('id',id); },
-  async deleteEmployee(id) { await sb.from('areso_employees').delete().eq('id',id); },
+  async deleteEmployee(id) { await sb.rpc('delete_employee_cascade', {emp_id: id}); },
   async markAnnouncementRead(id,userId) { const {data}=await sb.from('areso_announcements').select('read_by').eq('id',id).single(); const readBy=[...(data?.read_by||[]),userId]; await sb.from('areso_announcements').update({read_by:readBy}).eq('id',id); },
 };
 
