@@ -95,8 +95,7 @@ const ss={
 
 const CSS=<style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}input:focus,select:focus,textarea:focus{outline:none;border-color:${C.accent}!important}@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}video{border-radius:12px;width:100%}body{background:${C.bg}}::selection{background:${C.accent}22;color:${C.accent}}.profile-card:hover{transform:translateY(-3px) scale(1.03);}.profile-card:active{transform:scale(0.97);}`}</style>;
 
-function generateReport(employees,records,schedules,vacations,f,t){
-  // Build data per employee for the period
+function generateReport(employees,records,vacations,f,t){
   const d1=new Date(f),d2=new Date(t);
   const empData=employees.filter(e=>e.active).map(emp=>{
     let totalMs=0,days=0;
@@ -104,78 +103,57 @@ function generateReport(employees,records,schedules,vacations,f,t){
     for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){
       const dk=dateKey(d);
       const dayMs=getWorked(records,emp.id,dk);
-      const dayRecs=(records[dk]||[]).filter(r=>r.empId===emp.id).sort((a,b)=>a.time-b.time);
-      if(dayMs>0||dayRecs.length>0){
+      if(dayMs>0){
         totalMs+=dayMs; days++;
-        // find first in and last out
-        const firstIn=dayRecs.find(r=>r.type==="in");
-        const lastOut=[...dayRecs].reverse().find(r=>r.type==="out");
-        dailyRows.push({date:dk,entrada:firstIn?fmtTime(firstIn.time):"—",salida:lastOut?fmtTime(lastOut.time):"—",horas:fmtDur(dayMs)});
+        dailyRows.push({date:dk,horas:fmtDur(dayMs)});
       }
     }
     return{emp,totalMs,days,media:days?totalMs/days:0,dailyRows};
-  }).filter(x=>x.totalMs>0||x.dailyRows.length>0);
+  }).filter(x=>x.totalMs>0);
 
-  // CSV with clear sections
-  let csv="﻿";
-  csv+="INFORME ARESO
-";
-  csv+="Período:,"+f+" → "+t+"
-";
-  csv+="Generado:,"+new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})+"
+  const MONTH_NAMES_LONG=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  const now=new Date();
+  let csv="\ufeff";
+  csv+="INFORME DE HORAS TRABAJADAS - ARESO\n";
+  csv+="Período:," + f + " a " + t + "\n";
+  csv+="Generado:," + now.getDate()+" de "+MONTH_NAMES_LONG[now.getMonth()]+" de "+now.getFullYear() + "\n\n";
 
-";
-
-  // Section 1: Summary
-  csv+="=== RESUMEN POR TRABAJADOR ===
-";
-  csv+="Trabajador,Puesto,Estado,Días trabajados,Horas totales,Media diaria
-";
-  empData.forEach(({emp,totalMs,days,media})=>{
-    const estado=emp.sickLeave?"DE BAJA":"Activo";
-    csv+=`"${emp.name}","${emp.position||"—"}",${estado},${days},${fmtDur(totalMs)},${days?fmtDur(media):"—"}
-`;
+  // Resumen ordenado por apellido
+  csv+="RESUMEN\n";
+  csv+="Trabajador,Puesto,Días,Horas totales,Media diaria\n";
+  [...empData].sort((a,b)=>a.emp.name.localeCompare(b.emp.name)).forEach(({emp,totalMs,days,media})=>{
+    csv+=`"${emp.name}","${emp.position||"—"}",${days},${fmtDur(totalMs)},${days?fmtDur(media):"—"}\n`;
   });
 
-  // Section 2: Daily detail per employee
-  csv+="
-=== DETALLE DIARIO POR TRABAJADOR ===
-";
-  empData.forEach(({emp,totalMs,days,dailyRows})=>{
-    csv+=`
-${emp.name} — ${emp.position||""}
-`;
-    csv+="Fecha,Día,Entrada,Salida,Horas
-";
+  // Total general
+  const totalAll=empData.reduce((s,x)=>s+x.totalMs,0);
+  csv+=`\nTOTAL EQUIPO,,,,${fmtDur(totalAll)}\n`;
+
+  // Detalle por persona (solo horas por día)
+  csv+="\nDETALLE POR TRABAJADOR\n";
+  [...empData].sort((a,b)=>a.emp.name.localeCompare(b.emp.name)).forEach(({emp,totalMs,days,dailyRows})=>{
+    csv+="\n" + emp.name + (emp.position?" ("+emp.position+")":"") + "\n";
+    csv+="Fecha,Día de la semana,Horas\n";
     dailyRows.forEach(row=>{
       const d=new Date(row.date);
-      const dayName=DAYS[(d.getDay()+6)%7];
-      csv+=`${row.date},${dayName},${row.entrada},${row.salida},${row.horas}
-`;
+      csv+=row.date+","+DAYS[(d.getDay()+6)%7]+","+row.horas+"\n";
     });
-    csv+=`,,,,TOTAL: ${fmtDur(totalMs)} (${days} días — media ${days?fmtDur(totalMs/days):"—"})
-`;
+    csv+="Total,,"+fmtDur(totalMs)+"\n";
   });
 
-  // Section 3: Vacations
-  const vacs=vacations.filter(v=>v.start<=t&&v.end>=f);
+  // Vacaciones del período
+  const vacs=vacations.filter(v=>v.start<=t&&v.end>=f&&v.status==="approved");
   if(vacs.length){
-    csv+="
-=== VACACIONES ===
-";
-    csv+="Trabajador,Desde,Hasta,Estado
-";
-    vacs.forEach(v=>{
+    csv+="\nVACACIONES APROBADAS\n";
+    csv+="Trabajador,Desde,Hasta\n";
+    vacs.sort((a,b)=>a.start.localeCompare(b.start)).forEach(v=>{
       const emp=employees.find(e=>e.id===v.empId);
-      const estado=v.status==="approved"?"Aprobada":v.status==="pending"?"Pendiente":"Rechazada";
-      csv+=`"${emp?.name||"?"}",${v.start},${v.end},${estado}
-`;
+      csv+=`"${emp?.name||"?"}",${v.start},${v.end}\n`;
     });
   }
 
   return csv;
 }
-
 // ─── PIN KEYPAD ───────────────────────────────────────────────
 function PinKeypad({ value, onChange, onConfirm, onClose, error, name, color, photo }) {
   const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
@@ -698,7 +676,7 @@ export default function App(){
           <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
             {[{l:"Esta semana",fn:()=>{const n=new Date();const d=n.getDay()||7;const m=new Date(n);m.setDate(n.getDate()-(d-1));setExportFrom(dateKey(m));setExportTo(dateKey());}},{l:"Este mes",fn:()=>{const n=new Date();setExportFrom(n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-01");setExportTo(dateKey());}},{l:"Mes pasado",fn:()=>{const n=new Date();n.setMonth(n.getMonth()-1);setExportFrom(dateKey(new Date(n.getFullYear(),n.getMonth(),1)));setExportTo(dateKey(new Date(n.getFullYear(),n.getMonth()+1,0)));}}].map(r=><button key={r.l} onClick={r.fn} style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:10}}>{r.l}</button>)}
           </div>
-          <button onClick={()=>{const csv=generateReport(employees,records,schedules,vacations,exportFrom,exportTo);const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`ARESO_Informe_${exportFrom}_${exportTo}.csv`;a.click();flash("Descargado");}} style={ss.btn(C.accent,"#000")}>📥 Descargar informe</button>
+          <button onClick={()=>{const csv=generateReport(employees,records,vacations,exportFrom,exportTo);const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`ARESO_Informe_${exportFrom}_${exportTo}.csv`;a.click();flash("Descargado");}} style={ss.btn(C.accent,"#000")}>📥 Descargar informe</button>
         </div>
       </div>}
 
