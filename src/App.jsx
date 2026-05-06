@@ -5,10 +5,9 @@ const SUPABASE_URL = 'https://uyodcfxggvojltmsugyq.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5b2RjZnhnZ3Zvamx0bXN1Z3lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2OTI0MzUsImV4cCI6MjA5MjI2ODQzNX0.5uh7JQKLpRvEVmTfxmQWHpdJQndLNvdFkloA4-N7OXA';
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Supabase helpers
 const DB = {
-  async getEmployees() { const {data}=await sb.from('areso_employees').select('*').order('created_at'); return (data||[]).map(e=>({id:e.id,name:e.name,email:e.email,pin:e.password,position:e.position,phone:e.phone,birthday:e.birthday,role:e.role,active:e.active,sickLeave:e.sick_leave||false,created:e.created_at})); },
-  async addEmployee(emp) { const {data}=await sb.from('areso_employees').insert({name:emp.name,email:emp.email,password:emp.pin,position:emp.position,phone:emp.phone,birthday:emp.birthday||null,role:emp.role||'employee',active:true}).select().single(); return data?{id:data.id,name:data.name,email:data.email,pin:data.password,position:data.position,phone:data.phone,birthday:data.birthday,role:data.role,active:data.active,created:data.created_at}:null; },
+  async getEmployees() { const {data}=await sb.from('areso_employees').select('*').order('created_at'); return (data||[]).map(e=>({id:e.id,name:e.name,email:e.email,pin:e.password,position:e.position,phone:e.phone,birthday:e.birthday,role:e.role,active:e.active,sickLeave:e.sick_leave||false,photo:e.photo||null,created:e.created_at})); },
+  async addEmployee(emp) { const {data}=await sb.from('areso_employees').insert({name:emp.name,email:emp.email,password:emp.pin,position:emp.position,phone:emp.phone,birthday:emp.birthday||null,role:emp.role||'employee',active:true}).select().single(); return data?{id:data.id,name:data.name,email:data.email,pin:data.password,position:data.position,phone:data.phone,birthday:data.birthday,role:data.role,active:data.active,photo:data.photo||null,created:data.created_at}:null; },
   async updateEmployee(id,fields) { const dbFields={}; if('active' in fields)dbFields.active=fields.active; if('role' in fields)dbFields.role=fields.role; if('sick_leave' in fields)dbFields.sick_leave=fields.sick_leave; await sb.from('areso_employees').update(dbFields).eq('id',id); },
   async getClockIns(dateFrom,dateTo) { const {data}=await sb.from('areso_clockins').select('*').gte('time',dateFrom).lte('time',dateTo+'T23:59:59').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:r.photo_url})); },
   async getAllClockIns() { const {data}=await sb.from('areso_clockins').select('*').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:r.photo_url})); },
@@ -28,6 +27,7 @@ const DB = {
   async deleteAnnouncement(id) { await sb.from('areso_announcements').delete().eq('id',id); },
   async markAnnouncementRead(id,userId) { const {data}=await sb.from('areso_announcements').select('read_by').eq('id',id).single(); const readBy=[...(data?.read_by||[]),userId]; await sb.from('areso_announcements').update({read_by:readBy}).eq('id',id); },
 };
+
 const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 const MONTHS=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const ADMIN_PIN="admin";
@@ -41,7 +41,6 @@ const getStatus=(records,eid)=>{const r=(records[dateKey()]||[]).filter(x=>x.emp
 const getLastRec=(records,eid)=>{const r=(records[dateKey()]||[]).filter(x=>x.empId===eid).sort((a,b)=>a.time-b.time);return r.length?r[r.length-1]:null;};
 const getNextSched=(scheds,eid)=>{const now=new Date();for(let i=0;i<14;i++){const d=new Date(now);d.setDate(d.getDate()+i);const key=eid+"_"+dateKey(d);const s=scheds[key];if(s)return{day:DAYS[(d.getDay()+6)%7],start:s.start,end:s.end,isToday:i===0};}return null;};
 
-// Birthday helpers
 const getUpcomingBirthdays=(emps)=>{
   const today=new Date();const results=[];
   emps.filter(e=>e.active&&e.birthday).forEach(emp=>{
@@ -54,7 +53,6 @@ const getUpcomingBirthdays=(emps)=>{
   return results.sort((a,b)=>a.daysUntil-b.daysUntil);
 };
 
-// Colors
 const AVATAR_COLORS=["#2d5be3","#16a34a","#ea580c","#7c3aed","#dc2626","#0891b2","#db2777","#ca8a04","#4f46e5","#059669"];
 const getAvatarColor=(id)=>AVATAR_COLORS[Math.abs(id?.split("").reduce((a,c)=>a+c.charCodeAt(0),0)||0)%AVATAR_COLORS.length];
 
@@ -93,9 +91,9 @@ const ss={
   avatar:(color,size=40)=>({width:size,height:size,borderRadius:"50%",background:color+"22",border:`2px solid ${color}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:size*0.38,fontWeight:700,color,flexShrink:0}),
   badge:(bg,c)=>({position:"absolute",top:-4,right:-4,background:bg,color:c,fontFamily:font,fontSize:9,fontWeight:700,width:18,height:18,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}),
 };
-const CSS=<style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}input:focus,select:focus,textarea:focus{outline:none;border-color:${C.accent}!important}@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}video{border-radius:12px;width:100%}body{background:${C.bg}}::selection{background:${C.accent}22;color:${C.accent}}`}</style>;
 
-// Export
+const CSS=<style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}input:focus,select:focus,textarea:focus{outline:none;border-color:${C.accent}!important}@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}video{border-radius:12px;width:100%}body{background:${C.bg}}::selection{background:${C.accent}22;color:${C.accent}}.profile-card:hover{transform:translateY(-3px) scale(1.03);}.profile-card:active{transform:scale(0.97);}`}</style>;
+
 function generateReport(employees,records,schedules,vacations,documents,f,t){
   let csv="\ufeffINFORME ARESO\nPeriodo: "+f+" a "+t+"\nGenerado: "+new Date().toLocaleString("es-ES")+"\n\n";
   csv+="RESUMEN POR EMPLEADO\nNombre,Puesto,Estado,Días,Horas totales,Media\n";
@@ -106,6 +104,138 @@ function generateReport(employees,records,schedules,vacations,documents,f,t){
   return csv;
 }
 
+// ─── PIN KEYPAD ───────────────────────────────────────────────
+function PinKeypad({ value, onChange, onConfirm, onClose, error, name, color, photo }) {
+  const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+  const handleKey = (k) => {
+    if (k === "⌫") { onChange(value.slice(0,-1)); }
+    else if (k !== "" && value.length < 20) { onChange(value + k); }
+  };
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(10,12,26,0.82)",backdropFilter:"blur(8px)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"fadeIn .2s ease"}}
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:"#0f1120",borderRadius:"24px 24px 0 0",padding:"24px 24px 44px",width:"100%",maxWidth:400,border:"1px solid rgba(255,255,255,.12)",animation:"slideUp .28s cubic-bezier(.22,1,.36,1)"}}>
+        {/* Avatar + nombre */}
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <div style={{width:56,height:56,borderRadius:"50%",background:color+"33",border:`2.5px solid ${color}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 8px",fontSize:photo?0:22,fontWeight:700,color,fontFamily:font,overflow:"hidden"}}>
+            {photo ? <img src={photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : name[0]}
+          </div>
+          <div style={{fontFamily:font,fontSize:16,fontWeight:700,color:"#fff"}}>{name}</div>
+        </div>
+        {/* Puntos */}
+        <div style={{display:"flex",justifyContent:"center",gap:10,marginBottom:8}}>
+          {[0,1,2,3,4,5].map(i=>(
+            <div key={i} style={{width:11,height:11,borderRadius:"50%",background:i<value.length?(error?"#dc2626":C.accent):"rgba(255,255,255,.18)",transition:"all .12s",transform:i<value.length?"scale(1.25)":"scale(1)"}}/>
+          ))}
+        </div>
+        <div style={{textAlign:"center",fontFamily:font,fontSize:12,color:"#dc2626",height:18,marginBottom:8}}>{error?"PIN incorrecto":""}</div>
+        {/* Teclado */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+          {keys.map((k,i)=>(
+            <button key={i} onClick={()=>handleKey(k)} style={{height:56,borderRadius:14,background:k==="⌫"?"rgba(255,255,255,.08)":k===""?"transparent":"rgba(255,255,255,.06)",border:k===""?"none":"1px solid rgba(255,255,255,.12)",color:k==="⌫"?"rgba(255,255,255,.6)":"#fff",fontSize:k==="⌫"?18:22,fontFamily:font,fontWeight:600,cursor:k===""?"default":"pointer",pointerEvents:k===""?"none":"auto",transition:"background .1s"}}
+              onMouseDown={e=>{if(k!=="")e.currentTarget.style.background=C.accent+"55";}}
+              onMouseUp={e=>{e.currentTarget.style.background=k==="⌫"?"rgba(255,255,255,.08)":"rgba(255,255,255,.06)";}}
+            >{k}</button>
+          ))}
+        </div>
+        <button onClick={onConfirm} style={{width:"100%",marginTop:14,height:52,borderRadius:14,background:value.length>0?C.accent:"rgba(255,255,255,.12)",border:"none",color:value.length>0?"#000":"rgba(255,255,255,.3)",fontFamily:font,fontSize:15,fontWeight:700,cursor:value.length>0?"pointer":"default",transition:"all .2s"}}>
+          Entrar
+        </button>
+        <button onClick={onClose} style={{width:"100%",marginTop:8,height:36,borderRadius:10,background:"transparent",border:"none",color:"rgba(255,255,255,.3)",fontFamily:font,fontSize:12,cursor:"pointer"}}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── PROFILE SELECTOR ─────────────────────────────────────────
+function ProfileSelector({ employees, onLogin, onAdminLogin, loading }) {
+  const [selected, setSelected] = useState(null);
+  const [pinVal, setPinVal] = useState("");
+  const [pinErr, setPinErr] = useState(false);
+
+  const activeEmps = employees.filter(e => e.active);
+
+  const handleSelect = (profile) => {
+    setSelected(profile);
+    setPinVal("");
+    setPinErr(false);
+  };
+
+  const handleConfirm = () => {
+    if (!selected) return;
+    if (selected.isAdmin) {
+      if (pinVal === ADMIN_PIN) { onAdminLogin(); }
+      else { setPinErr(true); setPinVal(""); setTimeout(()=>setPinErr(false),900); }
+    } else {
+      if (pinVal === selected.pin) { onLogin(selected); }
+      else { setPinErr(true); setPinVal(""); setTimeout(()=>setPinErr(false),900); }
+    }
+  };
+
+  if (loading) return (
+    <div style={{minHeight:"100vh",background:"#080a14",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font}}>
+      {CSS}
+      <div style={{textAlign:"center"}}>
+        <div style={{fontFamily:font,fontSize:13,color:C.accent,letterSpacing:5,marginBottom:12}}>ARESO</div>
+        <div style={{fontFamily:font,fontSize:13,color:"rgba(255,255,255,.4)"}}>Cargando...</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:"100vh",background:"#080a14",color:"#fff",fontFamily:fontBody,paddingBottom:40}}>
+      {CSS}
+      {/* Header */}
+      <div style={{padding:"48px 24px 28px",textAlign:"center"}}>
+        <div style={{fontFamily:font,fontSize:10,letterSpacing:6,color:C.accent,marginBottom:10}}>ARESO</div>
+        <div style={{fontSize:24,fontWeight:700}}>¿Quién eres?</div>
+        <div style={{fontFamily:font,fontSize:12,color:"rgba(255,255,255,.35)",marginTop:6}}>Selecciona tu perfil para continuar</div>
+      </div>
+
+      {/* Grid */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(96px,1fr))",gap:12,padding:"0 18px",maxWidth:480,margin:"0 auto"}}>
+        {activeEmps.map(emp => {
+          const color = getAvatarColor(emp.id);
+          return (
+            <div key={emp.id} className="profile-card" onClick={()=>handleSelect(emp)}
+              style={{display:"flex",flexDirection:"column",alignItems:"center",gap:9,cursor:"pointer",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:18,padding:"16px 8px",transition:"transform .2s, background .15s"}}>
+              <div style={{width:54,height:54,borderRadius:"50%",background:color+"33",border:`2.5px solid ${color}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:emp.photo?0:20,fontWeight:700,color,overflow:"hidden",flexShrink:0}}>
+                {emp.photo ? <img src={emp.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}
+              </div>
+              <div style={{fontFamily:font,fontSize:12,fontWeight:600,color:"#fff",textAlign:"center",lineHeight:1.3,wordBreak:"break-word"}}>{emp.name.split(" ")[0]}</div>
+              {emp.position && <div style={{fontFamily:font,fontSize:9,color:"rgba(255,255,255,.35)",textAlign:"center"}}>{emp.position}</div>}
+            </div>
+          );
+        })}
+        {/* Admin tile */}
+        <div className="profile-card" onClick={()=>handleSelect({isAdmin:true,name:"Admin"})}
+          style={{display:"flex",flexDirection:"column",alignItems:"center",gap:9,cursor:"pointer",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:18,padding:"16px 8px",transition:"transform .2s, background .15s"}}>
+          <div style={{width:54,height:54,borderRadius:"50%",background:"#7c3aed33",border:"2.5px solid #7c3aed",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔒</div>
+          <div style={{fontFamily:font,fontSize:12,fontWeight:600,color:"#fff"}}>Admin</div>
+          <div style={{fontFamily:font,fontSize:9,color:"rgba(255,255,255,.35)"}}>Administrador</div>
+        </div>
+      </div>
+
+      {/* PIN Modal */}
+      {selected && (
+        <PinKeypad
+          value={pinVal}
+          onChange={setPinVal}
+          onConfirm={handleConfirm}
+          onClose={()=>setSelected(null)}
+          error={pinErr}
+          name={selected.name}
+          color={selected.isAdmin ? "#7c3aed" : getAvatarColor(selected.id)}
+          photo={selected.photo||null}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── APP PRINCIPAL ─────────────────────────────────────────────
 export default function App(){
   const [employees,setEmployees]=useState([]);
   const [records,setRecords]=useState({});
@@ -125,7 +255,6 @@ export default function App(){
   const videoRef=useRef(null);const streamRef=useRef(null);const fileRef=useRef(null);const docFileRef=useRef(null);
   const [,tick]=useState(0);
 
-  const [adminPin,setAdminPin]=useState("");
   const [adminTab,setAdminTab]=useState("live");
   const [filterDate,setFilterDate]=useState(dateKey());
   const [editRecId,setEditRecId]=useState(null);
@@ -133,8 +262,6 @@ export default function App(){
   const [exportFrom,setExportFrom]=useState(()=>{const d=new Date();d.setDate(1);return dateKey(d);});
   const [exportTo,setExportTo]=useState(dateKey());
 
-  const [loginForm,setLoginForm]=useState({email:"",pin:""});
-  const [regForm,setRegForm]=useState({name:"",email:"",pin:"",position:"",phone:"",birthday:""});
   const [editSched,setEditSched]=useState(null);
   const [calWeekStart,setCalWeekStart]=useState(()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));return dateKey(n);});
   const [calWeekStart2,setCalWeekStart2]=useState(()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));return dateKey(n);});
@@ -146,7 +273,6 @@ export default function App(){
   const [docFile,setDocFile]=useState(null);
   const [annForm,setAnnForm]=useState({title:"",body:""});
 
-  // Load all data from Supabase on mount
   const loadData=useCallback(async()=>{
     try{
       const [emps,scheds,vacs,docs,anns,clockins]=await Promise.all([
@@ -157,7 +283,6 @@ export default function App(){
       setVacations(vacs);
       setDocuments(docs);
       setAnnouncements(anns);
-      // Group clockins by date
       const recs={};clockins.forEach(r=>{const dk=dateKey(new Date(r.time));if(!recs[dk])recs[dk]=[];recs[dk].push(r);});
       setRecords(recs);
     }catch(e){console.error("Error loading data:",e);}
@@ -174,56 +299,30 @@ export default function App(){
   const handleFile=e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>setPhoto(ev.target.result);r.readAsDataURL(f);e.target.value="";};
   const goHome=()=>{setSub(null);stopCamera();setPhoto(null);setPage("menu");};
 
-  const handleLogin=()=>{const emp=employees.find(e=>e.name.toLowerCase()===loginForm.email.toLowerCase()&&e.pin===loginForm.pin&&e.active);if(emp){setUser(emp);setView("app");setPage("menu");setSub(null);}else flash("Credenciales incorrectas",false);};
-  const handleRegister=async()=>{if(!regForm.name||!regForm.email||!regForm.pin)return flash("Rellena los campos obligatorios",false);if(employees.some(e=>e.email===regForm.email))return flash("Email ya registrado",false);const emp=await DB.addEmployee({name:regForm.name,email:regForm.email,pin:regForm.pin,position:regForm.position,phone:regForm.phone,birthday:regForm.birthday,role:"employee"});if(emp){setEmployees([...employees,emp]);flash("Cuenta creada");setView("login");}else flash("Error al crear cuenta",false);};
-
   const myStatus=user?getStatus(records,user.id):"out";
   const myWorked=user?getWorked(records,user.id,dateKey()):0;
   const confirmFichaje=async()=>{if(!photo)return flash("Foto primero",false);const dk=dateKey();const type=myStatus==="out"?"in":"out";const rec={empId:user.id,type,time:Date.now(),photo};await DB.addClockIn(rec);setRecords({...records,[dk]:[...(records[dk]||[]),rec]});flash(type==="in"?"✓ Entrada registrada":"✓ Salida registrada");setPhoto(null);loadData();};
 
-  // Unread counts
-  const unreadMsgs=user?messages.filter(m=>m.to===user.id&&!m.read).length:0;
   const unreadAnns=user?announcements.filter(a=>!a.readBy?.includes(user.id)).length:0;
 
   const Toast=toast&&<div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:999,padding:"10px 24px",borderRadius:12,fontWeight:600,fontSize:13,fontFamily:font,pointerEvents:"none",background:toast.ok?"#f0fdf4":"#fef2f2",color:toast.ok?C.green:C.red,border:`1px solid ${toast.ok?"#16a34a33":"#dc262633"}`,boxShadow:"0 4px 12px #0002"}}>{toast.msg}</div>;
 
-  // ═══ LOGIN ═══
-  if(loading)return(<div style={{...ss.page,display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}>{CSS}<div style={{textAlign:"center"}}><div style={{fontFamily:font,fontSize:13,color:C.accent,letterSpacing:5,marginBottom:12}}>ARESO</div><div style={{fontFamily:font,fontSize:13,color:C.muted}}>Cargando...</div></div></div>);
-
-  if(view==="login")return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:400,margin:"0 auto",padding:20,minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",gap:24,animation:"fadeUp .4s"}}>
-    <div style={{textAlign:"center"}}><div style={{fontFamily:font,fontSize:13,color:C.accent,letterSpacing:5,marginBottom:8}}>ARESO</div><div style={{fontSize:26,fontWeight:700}}>Iniciar sesión</div></div>
-    <div style={{display:"flex",flexDirection:"column",gap:12}}><input placeholder="Nombre" value={loginForm.email} onChange={e=>setLoginForm({...loginForm,email:e.target.value})} style={ss.input}/><input placeholder="Contraseña" type="password" value={loginForm.pin} onChange={e=>setLoginForm({...loginForm,pin:e.target.value})} style={ss.input} onKeyDown={e=>e.key==="Enter"&&handleLogin()}/><button onClick={handleLogin} style={ss.btn(C.accent,"#000")}>Entrar</button></div>
-    <button onClick={()=>{setView("admin-login");setAdminPin("");}} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 20px",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,width:"100%"}}>🔒 Acceder como administrador</button>
-  </div></div>);
-
-  // ═══ REGISTER ═══
-  if(view==="register")return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:400,margin:"0 auto",padding:20,minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",gap:24,animation:"fadeUp .4s"}}>
-    <div style={{textAlign:"center"}}><div style={{fontFamily:font,fontSize:13,color:C.accent,letterSpacing:5,marginBottom:8}}>ARESO</div><div style={{fontSize:26,fontWeight:700}}>Crear cuenta</div></div>
-    <div style={{display:"flex",flexDirection:"column",gap:10}}>
-      <input placeholder="Nombre completo *" value={regForm.name} onChange={e=>setRegForm({...regForm,name:e.target.value})} style={ss.input}/>
-      <input placeholder="Email *" value={regForm.email} onChange={e=>setRegForm({...regForm,email:e.target.value})} style={ss.input}/>
-      <input placeholder="Contraseña *" type="password" value={regForm.pin} onChange={e=>setRegForm({...regForm,pin:e.target.value})} style={ss.input}/>
-      <input placeholder="Puesto (Cocina, Sala...)" value={regForm.position} onChange={e=>setRegForm({...regForm,position:e.target.value})} style={ss.input}/>
-      <input placeholder="Teléfono" value={regForm.phone} onChange={e=>setRegForm({...regForm,phone:e.target.value})} style={ss.input}/>
-      <div><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:4}}>Fecha de nacimiento</div><input type="date" value={regForm.birthday} onChange={e=>setRegForm({...regForm,birthday:e.target.value})} style={ss.input}/></div>
-      <button onClick={handleRegister} style={ss.btn(C.accent,"#000")}>Registrarse</button>
-    </div>
-    <button onClick={()=>setView("login")} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,textDecoration:"underline"}}>Ya tengo cuenta</button>
-  </div></div>);
-
-  // ═══ ADMIN LOGIN ═══
-  if(view==="admin-login")return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:400,margin:"0 auto",padding:20,minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",gap:24,animation:"fadeUp .4s"}}>
-    <div style={{textAlign:"center"}}><div style={{fontFamily:font,fontSize:13,color:C.accent,letterSpacing:5,marginBottom:8}}>ARESO</div><div style={{fontSize:26,fontWeight:700}}>Administrador</div><div style={{fontFamily:font,fontSize:11,color:C.muted,marginTop:8}}>Contraseña: admin</div></div>
-    <div style={{display:"flex",flexDirection:"column",gap:12}}><input type="password" placeholder="Contraseña admin" value={adminPin} onChange={e=>setAdminPin(e.target.value)} style={ss.input} onKeyDown={e=>e.key==="Enter"&&(adminPin===ADMIN_PIN?(setView("admin"),setAdminTab("live")):flash("Contraseña incorrecta",false))}/><button onClick={()=>adminPin===ADMIN_PIN?(setView("admin"),setAdminTab("live")):flash("Contraseña incorrecta",false)} style={ss.btn(C.accent,"#000")}>Entrar</button></div>
-    <button onClick={()=>setView("login")} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,textDecoration:"underline"}}>← Volver</button>
-  </div></div>);
+  // ═══ LOGIN / SELECTOR DE PERFILES ═══
+  if(view==="login") return (
+    <ProfileSelector
+      employees={employees}
+      loading={loading}
+      onLogin={(emp)=>{setUser(emp);setView("app");setPage("menu");setSub(null);}}
+      onAdminLogin={()=>{setView("admin");setAdminTab("live");}}
+    />
+  );
 
   // ═══ ADMIN PANEL ═══
   if(view==="admin"){
     const tabs=[{id:"live",l:"📡 Directo"},{id:"calendar",l:"📅 Horarios"},{id:"monthly",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:600,margin:"0 auto",padding:"16px 16px 24px"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div><button onClick={()=>setView("login")} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
       <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>setAdminTab(t.id)} style={{padding:"7px 10px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:font,fontSize:9,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#000":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
 
       {/* LIVE */}
@@ -231,7 +330,6 @@ export default function App(){
         <div style={{display:"flex",gap:10}}>
           {[{n:employees.filter(e=>e.active&&getStatus(records,e.id)==="in").length,l:"Trabajando",c:C.green},{n:employees.filter(e=>e.active&&getStatus(records,e.id)==="out").length,l:"Fuera",c:C.dim},{n:(records[dateKey()]||[]).length,l:"Fichajes",c:C.accent}].map((x,i)=><div key={i} style={{...ss.card,padding:"14px",textAlign:"center",flex:1}}><div style={{fontFamily:font,fontSize:28,fontWeight:700,color:x.c}}>{x.n}</div><div style={{fontFamily:font,fontSize:9,color:C.muted}}>{x.l}</div></div>)}
         </div>
-        {/* Who's in */}
         {["in","out"].map(status=>{const emps=employees.filter(e=>e.active&&getStatus(records,e.id)===status);if(!emps.length)return null;
           return(<div key={status}><div style={{fontFamily:font,fontSize:11,color:status==="in"?C.green:C.dim,marginBottom:8,marginTop:8}}>{status==="in"?"🟢 Trabajando":"⚫ Fuera"}</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{emps.map(emp=>{const w=getWorked(records,emp.id,dateKey());const col=getAvatarColor(emp.id);return(<div key={emp.id} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,width:60}}>
@@ -240,34 +338,28 @@ export default function App(){
             {w>0&&<div style={{fontFamily:font,fontSize:8,color:C.accent}}>{fmtDur(w)}</div>}
           </div>);})}</div></div>);
         })}
-        {/* Birthdays */}
         {getUpcomingBirthdays(employees).length>0&&<><div style={ss.secTitle}>🎂 Próximos cumpleaños</div>{getUpcomingBirthdays(employees).map(emp=><div key={emp.id} style={{...ss.statusCard,padding:"10px 14px"}}><div style={ss.avatar(getAvatarColor(emp.id),36)}>{emp.name[0]}</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{emp.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:10,color:C.muted}}>{emp.dateStr}</div></div><div style={{fontFamily:font,fontSize:11,color:emp.daysUntil===0?"#ec4899":C.muted,fontWeight:700}}>{emp.daysUntil===0?"¡Hoy!":emp.daysUntil===1?"Mañana":emp.daysUntil+"d"}</div></div>)}</>}
       </div>}
 
-      {/* CALENDAR - Visual Schedule */}
+      {/* CALENDAR */}
       {adminTab==="calendar"&&(()=>{
         const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),num:d.getDate(),month:MONTHS[d.getMonth()]});}
         const shiftWeek=(dir)=>{const d=new Date(calWeekStart);d.setDate(d.getDate()+(dir*7));setCalWeekStart(dateKey(d));};
         const activeEmps=employees.filter(e=>e.active);
         return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
-          {/* Week navigation */}
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <button onClick={()=>shiftWeek(-1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>←</button>
             <div style={{flex:1,textAlign:"center"}}><span style={{fontFamily:font,fontSize:13,fontWeight:700}}>{weekDays[0].num} {weekDays[0].month}</span><span style={{fontFamily:font,fontSize:13,color:C.dim}}> — </span><span style={{fontFamily:font,fontSize:13,fontWeight:700}}>{weekDays[6].num} {weekDays[6].month}</span></div>
             <button onClick={()=>shiftWeek(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>→</button>
             <button onClick={()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));setCalWeekStart(dateKey(n));}} style={{...ss.btn(C.card,C.muted),width:"auto",border:`1px solid ${C.border}`,padding:"8px 12px",fontSize:10}}>Hoy</button>
           </div>
-
-          {/* Calendar grid */}
           <div style={{overflowX:"auto"}}>
             <div style={{display:"grid",gridTemplateColumns:`100px repeat(7, 1fr)`,gap:2,minWidth:600}}>
-              {/* Header row */}
               <div style={{padding:8}}/>
               {weekDays.map(d=><div key={d.date} style={{padding:"8px 4px",textAlign:"center",background:d.date===dateKey()?C.accent+"22":C.cardLight,borderRadius:8}}>
                 <div style={{fontFamily:font,fontSize:10,color:d.date===dateKey()?C.accent:C.muted}}>{d.label}</div>
                 <div style={{fontFamily:font,fontSize:16,fontWeight:700,color:d.date===dateKey()?C.accent:C.text}}>{d.num}</div>
               </div>)}
-              {/* Employee rows */}
               {activeEmps.map(emp=>{const col=getAvatarColor(emp.id);return(<React.Fragment key={emp.id}>
                 <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 4px"}}>
                   <div style={ss.avatar(col,28)}>{emp.name[0]}</div>
@@ -284,8 +376,6 @@ export default function App(){
               </React.Fragment>);})}
             </div>
           </div>
-
-          {/* Add shift modal */}
           {addShift&&<div style={{...ss.card,border:`1px solid ${C.accent}`}}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
               <span style={{fontWeight:700,fontSize:14}}>{employees.find(e=>e.id===addShift.empId)?.name.split(" ")[0]}</span>
@@ -299,11 +389,8 @@ export default function App(){
             <div style={{display:"flex",gap:6}}>
               <button onClick={async()=>{await DB.setSchedule(addShift.empId,addShift.dayKey,shiftForm.start,shiftForm.end);const key=addShift.empId+"_"+addShift.dayKey;setSchedules({...schedules,[key]:{empId:addShift.empId,start:shiftForm.start,end:shiftForm.end}});setAddShift(null);flash("Turno añadido");}} style={ss.btn(C.accent,"#000")}>Guardar turno</button>
             </div>
-            {/* Quick copy to whole week */}
             <button onClick={async()=>{const newScheds={...schedules};for(const d of weekDays){await DB.setSchedule(addShift.empId,d.date,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+d.date]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}setSchedules(newScheds);setAddShift(null);flash("Copiado a toda la semana");}} style={{...ss.btn(C.cardLight,C.muted),marginTop:6,border:`1px solid ${C.border}`,fontSize:11}}>Copiar a toda la semana</button>
           </div>}
-
-          {/* Legend */}
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
             {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:4,fontFamily:font,fontSize:10}}>
               <div style={{width:10,height:10,borderRadius:3,background:getAvatarColor(emp.id)}}/>
@@ -329,7 +416,6 @@ export default function App(){
 
       {/* EMPLOYEES */}
       {adminTab==="employees"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
-        {/* Add employee form */}
         <div style={{...ss.card}}>
           <div style={ss.label}>Crear trabajador</div>
           <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8}}>
@@ -344,7 +430,6 @@ export default function App(){
             <button onClick={async()=>{const n=document.getElementById("adm-emp-name").value;const p=document.getElementById("adm-emp-pass").value;if(!n||!p)return flash("Nombre y contraseña obligatorios",false);const emp=await DB.addEmployee({name:n,email:document.getElementById("adm-emp-email").value,pin:p,position:document.getElementById("adm-emp-pos").value,phone:document.getElementById("adm-emp-phone").value,birthday:document.getElementById("adm-emp-bday").value,role:"employee"});if(emp){setEmployees([...employees,emp]);document.getElementById("adm-emp-name").value="";document.getElementById("adm-emp-email").value="";document.getElementById("adm-emp-pass").value="";document.getElementById("adm-emp-pos").value="";document.getElementById("adm-emp-phone").value="";document.getElementById("adm-emp-bday").value="";flash("Trabajador creado");}else flash("Error",false);}} style={ss.btn(C.accent,"#fff")}>+ Crear trabajador</button>
           </div>
         </div>
-        {/* Employee list */}
         <div style={ss.label}>Equipo</div>
         {employees.map(emp=><div key={emp.id} style={{...ss.statusCard,opacity:emp.active?1:0.5}}>
           <div style={ss.avatar(getAvatarColor(emp.id),36)}>{emp.name[0]}</div>
@@ -359,7 +444,7 @@ export default function App(){
         </div>)}
       </div>}
 
-      {/* ANNOUNCEMENTS (admin) */}
+      {/* ANNOUNCEMENTS */}
       {adminTab==="announcements"&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
         <div style={{...ss.card,display:"flex",flexDirection:"column",gap:10}}>
           <div style={ss.label}>Nuevo comunicado</div>
@@ -385,39 +470,28 @@ export default function App(){
         const prevMonth=()=>{const m=month===0?11:month-1;const y=month===0?year-1:year;setCalMonthView(y*100+m);};
         const nextMonth=()=>{const m=month===11?0:month+1;const y=month===11?year+1:year;setCalMonthView(y*100+m);};
         const MONTH_NAMES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-
-        // Build calendar cells
         const cells=[];
         for(let i=0;i<startDow;i++)cells.push(null);
         for(let d=1;d<=daysInMonth;d++)cells.push(d);
-
-        // Get shifts and vacations for a day
         const getDayData=(day)=>{
           const dk=`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
           const shifts=[];const vacs=[];
           activeEmps.forEach(emp=>{
             const s=schedules[emp.id+"_"+dk];
             if(s)shifts.push({emp,shift:s,color:getAvatarColor(emp.id)});
-            vacations.filter(v=>v.empId===emp.id&&(v.status==="approved"||v.status==="pending")&&v.start<=dk&&v.end>=dk).forEach(v=>{
-              vacs.push({emp,vac:v,color:getAvatarColor(emp.id)});
-            });
+            vacations.filter(v=>v.empId===emp.id&&(v.status==="approved"||v.status==="pending")&&v.start<=dk&&v.end>=dk).forEach(v=>{vacs.push({emp,vac:v,color:getAvatarColor(emp.id)});});
           });
           return{shifts,vacs,dk};
         };
-
         return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>←</button>
             <div style={{flex:1,textAlign:"center",fontSize:18,fontWeight:700}}>{MONTH_NAMES[month]} {year}</div>
             <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>→</button>
           </div>
-
-          {/* Day headers */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
             {["L","M","X","J","V","S","D"].map(d=><div key={d} style={{textAlign:"center",fontFamily:font,fontSize:10,color:C.muted,padding:4}}>{d}</div>)}
           </div>
-
-          {/* Calendar grid */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}}>
             {cells.map((day,i)=>{
               if(!day)return <div key={i}/>;
@@ -435,8 +509,6 @@ export default function App(){
               </div>);
             })}
           </div>
-
-          {/* Legend */}
           <div style={{...ss.card,padding:12}}>
             <div style={{fontFamily:font,fontSize:10,color:C.muted,marginBottom:8}}>Leyenda</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
@@ -460,14 +532,6 @@ export default function App(){
           {v.status==="pending"&&<div style={{display:"flex",gap:6}}><button onClick={async()=>{await DB.updateVacation(v.id,"approved");setVacations(vacations.map(x=>x.id===v.id?{...x,status:"approved"}:x));flash("Aprobada");}} style={{...ss.btn(C.green,"#000"),padding:"8px",fontSize:12}}>✓</button><button onClick={async()=>{await DB.updateVacation(v.id,"rejected");setVacations(vacations.map(x=>x.id===v.id?{...x,status:"rejected"}:x));flash("Rechazada");}} style={{...ss.btn(C.red,"#000"),padding:"8px",fontSize:12}}>✕</button></div>}
         </div>);})}
         {!vacations.length&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin solicitudes</div>}
-      </div>}
-
-      {/* DOCS */}
-      {adminTab==="docs"&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {documents.sort((a,b)=>b.id-a.id).map(d=>{const emp=employees.find(e=>e.id===d.empId);return(<div key={d.id} style={{...ss.card,display:"flex",flexDirection:"column",gap:6}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:600}}>{emp?.name?.split(" ")[0]}</span><span style={{fontFamily:font,fontSize:12}}>{{medical:"🏥",personal:"👤",other:"📄"}[d.type]} {d.type}</span><span style={{fontFamily:font,fontSize:10,color:C.muted,marginLeft:"auto"}}>{d.date}</span></div>
-          {d.file?.startsWith("data:image")&&<img src={d.file} alt="" style={{width:"100%",maxHeight:120,objectFit:"cover",borderRadius:10}}/>}
-        </div>);})}
       </div>}
 
       {/* EXPORT */}
@@ -500,9 +564,8 @@ export default function App(){
       {!photo?(<div style={{...ss.card,textAlign:"center",display:"flex",flexDirection:"column",gap:12,padding:20}}><div style={{fontFamily:font,fontSize:11,color:C.muted}}>📸 Foto al reloj para {myStatus==="out"?"entrada":"salida"}</div>{cameraOn?(<><video ref={videoRef} autoPlay playsInline muted/><button onClick={takePhoto} style={ss.btn(myStatus==="out"?C.green:C.red,"#000")}>📸 Capturar</button><button onClick={stopCamera} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Cancelar</button></>):(<><button onClick={startCamera} style={ss.btn(myStatus==="out"?C.green:C.red,"#000")}>📷 Abrir cámara</button><button onClick={()=>fileRef.current?.click()} style={{...ss.btn(C.cardLight,C.muted),border:`1px solid ${C.border}`}}>📁 Subir de galería</button><input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{display:"none"}}/></>)}</div>):(<div style={{display:"flex",flexDirection:"column",gap:12}}><img src={photo} alt="" style={{width:"100%",borderRadius:14,border:`2px solid ${C.border}`}}/><button onClick={confirmFichaje} style={ss.btn(myStatus==="out"?C.green:C.red,"#000")}>✓ Confirmar {myStatus==="out"?"entrada":"salida"}</button><button onClick={()=>setPhoto(null)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11,textAlign:"center"}}>Repetir foto</button></div>)}
     </div>}
 
-    {/* HORARIOS - Employee visual calendar */}
+    {/* HORARIOS */}
     {sub==="horarios"&&(()=>{
-      const getWeekStart=()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));return dateKey(n);};
       const [wk,setWk]=[calWeekStart2,setCalWeekStart2];
       const weekDays=[];for(let i=0;i<7;i++){const d=new Date(wk);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),num:d.getDate(),full:DAYS[i]});}
       const shiftWk=(dir)=>{const d=new Date(wk);d.setDate(d.getDate()+(dir*7));setCalWeekStart2(dateKey(d));};
@@ -533,7 +596,6 @@ export default function App(){
             </div>
           ))}
         </div>
-        {/* Team view */}
         <div style={ss.secTitle}>Equipo esta semana</div>
         <div style={{overflowX:"auto"}}>
           <div style={{display:"grid",gridTemplateColumns:`80px repeat(7,1fr)`,gap:2,minWidth:500}}>
@@ -561,11 +623,11 @@ export default function App(){
       <div style={{...ss.card,display:"flex",flexDirection:"column",gap:10}}><select value={docForm.type} onChange={e=>setDocForm({...docForm,type:e.target.value})} style={ss.input}><option value="medical">Justificante médico</option><option value="personal">Personal</option><option value="other">Otro</option></select><input placeholder="Notas" value={docForm.notes} onChange={e=>setDocForm({...docForm,notes:e.target.value})} style={ss.input}/><button onClick={()=>docFileRef.current?.click()} style={{...ss.btn(docFile?C.green:C.cardLight,docFile?"#000":C.muted),border:docFile?"none":`1px solid ${C.border}`}}>{docFile?"✓ Archivo":"📎 Seleccionar"}</button><input ref={docFileRef} type="file" accept="image/*,.pdf" onChange={e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>setDocFile(ev.target.result);r.readAsDataURL(f);e.target.value="";}} style={{display:"none"}}/><button onClick={async()=>{if(!docFile)return flash("Archivo",false);await DB.addDocument({empId:user.id,type:docForm.type,file:docFile,notes:docForm.notes});setDocFile(null);setDocForm({type:"medical",notes:""});flash("Subido");loadData();}} style={ss.btn(C.accent,"#000")}>Subir</button></div>
     </div>}
 
-    {/* COMUNICADOS (employee view) */}
+    {/* COMUNICADOS */}
     {sub==="comunicados"&&<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:12}}><button onClick={goHome} style={ss.back}>← Menú</button><div style={{fontSize:20,fontWeight:700}}>Comunicados</div>
       {announcements.map(a=>{
         const isRead=a.readBy?.includes(user.id);
-        return(<div key={a.id} style={{...ss.card,borderColor:isRead?C.border:C.orange}} onClick={async()=>{if(!isRead){await DB.markAnnouncementRead(a.id,user.id);setAnnouncements(announcements.map(x=>x.id===a.id?{...x,readBy:[...(x.readBy||[]),user.id]}:x));}}}> 
+        return(<div key={a.id} style={{...ss.card,borderColor:isRead?C.border:C.orange}} onClick={async()=>{if(!isRead){await DB.markAnnouncementRead(a.id,user.id);setAnnouncements(announcements.map(x=>x.id===a.id?{...x,readBy:[...(x.readBy||[]),user.id]}:x));}}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>{!isRead&&<div style={{width:8,height:8,borderRadius:"50%",background:C.orange}}/>}<div style={{fontSize:15,fontWeight:700,flex:1}}>{a.title}</div><span style={{fontFamily:font,fontSize:10,color:C.muted}}>{fmtDate(a.date)}</span></div>
           <div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>{a.body}</div>
         </div>);
@@ -573,15 +635,17 @@ export default function App(){
       {!announcements.length&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin comunicados</div>}
     </div>}
 
-    {/* ─── MENU ─── */}
+    {/* MENU */}
     {!sub&&page==="menu"&&<>
-      <div style={ss.header}><div style={{display:"flex",alignItems:"center",gap:14}}><div style={{width:44,height:44,borderRadius:"50%",background:"#ffffff33",border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:16,fontWeight:700,color:"#fff"}}>{user.name.charAt(0)}</div><div><div style={{fontFamily:font,fontSize:10,color:"#ffffffaa",letterSpacing:1}}>Bienvenid@</div><div style={{fontSize:18,fontWeight:700,color:"#fff"}}>{user.name.toUpperCase()}</div></div></div></div>
+      <div style={ss.header}><div style={{display:"flex",alignItems:"center",gap:14}}>
+        <div style={{width:44,height:44,borderRadius:"50%",background:user.photo?"transparent":"#ffffff33",border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:16,fontWeight:700,color:"#fff",overflow:"hidden",flexShrink:0}}>
+          {user.photo ? <img src={user.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : user.name.charAt(0)}
+        </div>
+        <div><div style={{fontFamily:font,fontSize:10,color:"#ffffffaa",letterSpacing:1}}>Bienvenid@</div><div style={{fontSize:18,fontWeight:700,color:"#fff"}}>{user.name.toUpperCase()}</div></div>
+      </div></div>
       <div style={{padding:"0 16px 80px",display:"flex",flexDirection:"column",gap:10}}>
-        {/* Status cards */}
         <div style={ss.statusCard}><div style={{width:4,height:40,borderRadius:2,background:myStatus==="in"?C.green:C.accent,flexShrink:0}}/><div><div style={{fontWeight:600,fontSize:14}}>{myStatus==="in"?"Jornada en curso":"Jornada finalizada"}</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>{lastRec?`${fmtTime(lastRec.time)} · ${fmtDateLong(new Date())}`:"Sin fichajes hoy"}</div></div>{myWorked>0&&<div style={{marginLeft:"auto",fontFamily:font,fontSize:13,fontWeight:700,color:C.accent}}>{fmtDur(myWorked)}</div>}</div>
         {nextSched&&<div style={ss.statusCard}><div style={{width:4,height:40,borderRadius:2,background:C.blue,flexShrink:0}}/><div><div style={{fontWeight:600,fontSize:14}}>Próximo turno</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>{nextSched.isToday?"Hoy":nextSched.day}</div></div><div style={{marginLeft:"auto",fontFamily:font,fontSize:13,fontWeight:600,color:C.blue}}>{nextSched.start}-{nextSched.end}</div></div>}
-
-        {/* Who's in mini */}
         {employees.filter(e=>e.active&&getStatus(records,e.id)==="in").length>0&&<div style={ss.card}>
           <div style={{fontFamily:font,fontSize:10,color:C.green,letterSpacing:1,marginBottom:10}}>🟢 WHO'S IN</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
@@ -591,8 +655,6 @@ export default function App(){
             </div>)}
           </div>
         </div>}
-
-        {/* Birthdays */}
         {bdays.length>0&&<div style={ss.card}>
           <div style={{fontFamily:font,fontSize:10,color:"#ec4899",letterSpacing:1,marginBottom:10}}>🎂 CUMPLEAÑOS</div>
           <div style={{display:"flex",gap:14,overflowX:"auto"}}>
@@ -603,8 +665,6 @@ export default function App(){
             </div>)}
           </div>
         </div>}
-
-        {/* Modules */}
         <div style={ss.secTitle}>Jornada</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <div style={ss.moduleCard} onClick={()=>setSub("fichar")}>{Ic.clock}<span style={{fontSize:14,fontWeight:600}}>Fichar</span></div>
@@ -624,7 +684,13 @@ export default function App(){
 
     {/* PROFILE */}
     {!sub&&page==="profile"&&<>
-      <div style={{background:`linear-gradient(135deg,#2d5be3,#1e40af)`,padding:"40px 20px 30px",borderRadius:"0 0 24px 24px",textAlign:"center"}}><div style={{width:72,height:72,borderRadius:"50%",background:"#ffffff33",border:"3px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontFamily:font,fontSize:28,fontWeight:700,color:"#fff"}}>{user.name[0]}</div><div style={{fontSize:22,fontWeight:700,color:"#fff"}}>{user.name.toUpperCase()}</div><div style={{fontFamily:font,fontSize:11,color:"#ffffffaa",marginTop:4}}>Empleado</div></div>
+      <div style={{background:`linear-gradient(135deg,#2d5be3,#1e40af)`,padding:"40px 20px 30px",borderRadius:"0 0 24px 24px",textAlign:"center"}}>
+        <div style={{width:72,height:72,borderRadius:"50%",background:user.photo?"transparent":"#ffffff33",border:"3px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontFamily:font,fontSize:28,fontWeight:700,color:"#fff",overflow:"hidden"}}>
+          {user.photo ? <img src={user.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : user.name[0]}
+        </div>
+        <div style={{fontSize:22,fontWeight:700,color:"#fff"}}>{user.name.toUpperCase()}</div>
+        <div style={{fontFamily:font,fontSize:11,color:"#ffffffaa",marginTop:4}}>Empleado</div>
+      </div>
       <div style={{padding:"20px 16px 80px",display:"flex",flexDirection:"column",gap:12}}>
         <div style={ss.card}><div style={{fontWeight:600,fontSize:14,color:C.accent,marginBottom:14}}>Datos Personales</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Email</div><div style={{fontFamily:font,fontSize:12,color:C.muted}}>{user.email}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Puesto</div><div style={{fontFamily:font,fontSize:12,color:C.muted}}>{user.position||"—"}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Teléfono</div><div style={{fontFamily:font,fontSize:12,color:C.muted}}>{user.phone||"—"}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Cumpleaños</div><div style={{fontFamily:font,fontSize:12,color:C.muted}}>{user.birthday||"—"}</div></div></div></div>
         <div style={ss.card}><div style={{fontWeight:600,fontSize:14,color:C.accent,marginBottom:14}}>Resumen</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Horas hoy</div><div style={{fontFamily:font,fontSize:16,fontWeight:700,color:C.accent}}>{fmtDur(myWorked)}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Fichajes</div><div style={{fontFamily:font,fontSize:16,fontWeight:700}}>{(records[dateKey()]||[]).filter(r=>r.empId===user.id).length}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Vacaciones</div><div style={{fontFamily:font,fontSize:16,fontWeight:700,color:C.green}}>{vacations.filter(v=>v.empId===user.id&&v.status==="approved").length}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Documentos</div><div style={{fontFamily:font,fontSize:16,fontWeight:700,color:C.purple}}>{documents.filter(d=>d.empId===user.id).length}</div></div></div></div>
