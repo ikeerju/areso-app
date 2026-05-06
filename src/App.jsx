@@ -109,7 +109,11 @@ function PinKeypad({ value, onChange, onConfirm, onClose, error, name, color, ph
   const keys = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
   const handleKey = (k) => {
     if (k === "⌫") { onChange(value.slice(0,-1)); }
-    else if (k !== "" && value.length < 20) { onChange(value + k); }
+    else if (k !== "" && value.length < 4) {
+      const next = value + k;
+      onChange(next);
+      if (next.length === 4) setTimeout(onConfirm, 120);
+    }
   };
   return (
     <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(10,12,26,0.82)",backdropFilter:"blur(8px)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"fadeIn .2s ease"}}
@@ -124,7 +128,7 @@ function PinKeypad({ value, onChange, onConfirm, onClose, error, name, color, ph
         </div>
         {/* Puntos */}
         <div style={{display:"flex",justifyContent:"center",gap:10,marginBottom:8}}>
-          {[0,1,2,3,4,5].map(i=>(
+          {[0,1,2,3].map(i=>(
             <div key={i} style={{width:11,height:11,borderRadius:"50%",background:i<value.length?(error?"#dc2626":C.accent):"rgba(255,255,255,.18)",transition:"all .12s",transform:i<value.length?"scale(1.25)":"scale(1)"}}/>
           ))}
         </div>
@@ -138,7 +142,7 @@ function PinKeypad({ value, onChange, onConfirm, onClose, error, name, color, ph
             >{k}</button>
           ))}
         </div>
-        <button onClick={onConfirm} style={{width:"100%",marginTop:14,height:52,borderRadius:14,background:value.length>0?C.accent:"rgba(255,255,255,.12)",border:"none",color:value.length>0?"#000":"rgba(255,255,255,.3)",fontFamily:font,fontSize:15,fontWeight:700,cursor:value.length>0?"pointer":"default",transition:"all .2s"}}>
+        <button onClick={onConfirm} style={{width:"100%",marginTop:14,height:52,borderRadius:14,background:value.length>0?C.accent:"rgba(255,255,255,.12)",border:"none",color:value.length>0?"#fff":"rgba(255,255,255,.3)",fontFamily:font,fontSize:15,fontWeight:700,cursor:value.length>0?"pointer":"default",transition:"all .2s"}}>
           Entrar
         </button>
         <button onClick={onClose} style={{width:"100%",marginTop:8,height:36,borderRadius:10,background:"transparent",border:"none",color:"rgba(255,255,255,.3)",fontFamily:font,fontSize:12,cursor:"pointer"}}>
