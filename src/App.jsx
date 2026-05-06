@@ -7,9 +7,9 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Supabase helpers
 const DB = {
-  async getEmployees() { const {data}=await sb.from('areso_employees').select('*').order('created_at'); return (data||[]).map(e=>({id:e.id,name:e.name,email:e.email,pin:e.password,position:e.position,phone:e.phone,birthday:e.birthday,role:e.role,active:e.active,created:e.created_at})); },
+  async getEmployees() { const {data}=await sb.from('areso_employees').select('*').order('created_at'); return (data||[]).map(e=>({id:e.id,name:e.name,email:e.email,pin:e.password,position:e.position,phone:e.phone,birthday:e.birthday,role:e.role,active:e.active,sickLeave:e.sick_leave||false,created:e.created_at})); },
   async addEmployee(emp) { const {data}=await sb.from('areso_employees').insert({name:emp.name,email:emp.email,password:emp.pin,position:emp.position,phone:emp.phone,birthday:emp.birthday||null,role:emp.role||'employee',active:true}).select().single(); return data?{id:data.id,name:data.name,email:data.email,pin:data.password,position:data.position,phone:data.phone,birthday:data.birthday,role:data.role,active:data.active,created:data.created_at}:null; },
-  async updateEmployee(id,fields) { const dbFields={}; if('active' in fields)dbFields.active=fields.active; if('role' in fields)dbFields.role=fields.role; if('name' in fields)dbFields.name=fields.name; if('email' in fields)dbFields.email=fields.email; if('position' in fields)dbFields.position=fields.position; if('phone' in fields)dbFields.phone=fields.phone; if('birthday' in fields)dbFields.birthday=fields.birthday||null; if('pin' in fields)dbFields.password=fields.pin; await sb.from('areso_employees').update(dbFields).eq('id',id); },
+  async updateEmployee(id,fields) { const dbFields={}; if('active' in fields)dbFields.active=fields.active; if('role' in fields)dbFields.role=fields.role; if('sick_leave' in fields)dbFields.sick_leave=fields.sick_leave; await sb.from('areso_employees').update(dbFields).eq('id',id); },
   async getClockIns(dateFrom,dateTo) { const {data}=await sb.from('areso_clockins').select('*').gte('time',dateFrom).lte('time',dateTo+'T23:59:59').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:r.photo_url})); },
   async getAllClockIns() { const {data}=await sb.from('areso_clockins').select('*').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:r.photo_url})); },
   async addClockIn(rec) { await sb.from('areso_clockins').insert({employee_id:rec.empId,type:rec.type,time:new Date(rec.time).toISOString(),photo_url:rec.photo||null}); },
@@ -98,8 +98,8 @@ const CSS=<style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:
 // Export
 function generateReport(employees,records,schedules,vacations,documents,f,t){
   let csv="\ufeffINFORME ARESO\nPeriodo: "+f+" a "+t+"\nGenerado: "+new Date().toLocaleString("es-ES")+"\n\n";
-  csv+="RESUMEN POR EMPLEADO\nNombre,Puesto,Días,Horas totales,Media\n";
-  employees.filter(e=>e.active).forEach(emp=>{let ms=0,days=0;const d1=new Date(f),d2=new Date(t);for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){const w=getWorked(records,emp.id,dateKey(d));if(w>0){ms+=w;days++;}}csv+=`${emp.name},${emp.position||"—"},${days},${fmtDur(ms)},${days?fmtDur(ms/days):"—"}\n`;});
+  csv+="RESUMEN POR EMPLEADO\nNombre,Puesto,Estado,Días,Horas totales,Media\n";
+  employees.filter(e=>e.active).forEach(emp=>{let ms=0,days=0;const d1=new Date(f),d2=new Date(t);for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){const w=getWorked(records,emp.id,dateKey(d));if(w>0){ms+=w;days++;}}const estado=emp.sickLeave?"DE BAJA":"Activo";csv+=`${emp.name},${emp.position||"—"},${estado},${days},${fmtDur(ms)},${days?fmtDur(ms/days):"—"}\n`;});
   csv+="\nFICHAJES\nFecha,Hora,Empleado,Tipo\n";Object.keys(records).filter(d=>d>=f&&d<=t).sort().forEach(d=>(records[d]||[]).sort((a,b)=>a.time-b.time).forEach(r=>{const emp=employees.find(e=>e.id===r.empId);csv+=`${d},${fmtTime(r.time)},${emp?.name||"?"},${r.type==="in"?"Entrada":"Salida"}\n`;}));
   csv+="\nHORARIOS\nEmpleado,Día,Entrada,Salida\n";employees.filter(e=>e.active).forEach(emp=>DAYS.forEach((day,i)=>{const s=schedules[emp.id+"_"+i];if(s)csv+=`${emp.name},${day},${s.start},${s.end}\n`;}));
   csv+="\nVACACIONES\nEmpleado,Desde,Hasta,Estado\n";vacations.forEach(v=>{const emp=employees.find(e=>e.id===v.empId);csv+=`${emp?.name},${v.start},${v.end},${v.status}\n`;});
@@ -174,15 +174,15 @@ export default function App(){
   const handleFile=e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>setPhoto(ev.target.result);r.readAsDataURL(f);e.target.value="";};
   const goHome=()=>{setSub(null);stopCamera();setPhoto(null);setPage("menu");};
 
-  const handleLogin=async()=>{try{const {data,error}=await sb.from("areso_employees").select("*").ilike("name",loginForm.email.trim()).eq("password",loginForm.pin.trim()).eq("active",true).single();if(data&&!error){const emp={id:data.id,name:data.name,email:data.email,pin:data.password,position:data.position,phone:data.phone,birthday:data.birthday,role:data.role,active:data.active,created:data.created_at};setUser(emp);setView("app");setPage("menu");setSub(null);}else{flash("Credenciales incorrectas",false);}}catch(e){flash("Credenciales incorrectas",false);}};
+  const handleLogin=()=>{const emp=employees.find(e=>e.name.toLowerCase()===loginForm.email.toLowerCase()&&e.pin===loginForm.pin&&e.active);if(emp){setUser(emp);setView("app");setPage("menu");setSub(null);}else flash("Credenciales incorrectas",false);};
   const handleRegister=async()=>{if(!regForm.name||!regForm.email||!regForm.pin)return flash("Rellena los campos obligatorios",false);if(employees.some(e=>e.email===regForm.email))return flash("Email ya registrado",false);const emp=await DB.addEmployee({name:regForm.name,email:regForm.email,pin:regForm.pin,position:regForm.position,phone:regForm.phone,birthday:regForm.birthday,role:"employee"});if(emp){setEmployees([...employees,emp]);flash("Cuenta creada");setView("login");}else flash("Error al crear cuenta",false);};
 
   const myStatus=user?getStatus(records,user.id):"out";
   const myWorked=user?getWorked(records,user.id,dateKey()):0;
-  const confirmFichaje=async()=>{if(!photo)return flash("Foto primero",false);const dk=dateKey();const type=myStatus==="out"?"in":"out";const rec={empId:user.id,type,time:Date.now(),photo};await DB.addClockIn(rec);flash(type==="in"?"✓ Entrada registrada":"✓ Salida registrada");setPhoto(null);await loadData();};
+  const confirmFichaje=async()=>{if(!photo)return flash("Foto primero",false);const dk=dateKey();const type=myStatus==="out"?"in":"out";const rec={empId:user.id,type,time:Date.now(),photo};await DB.addClockIn(rec);setRecords({...records,[dk]:[...(records[dk]||[]),rec]});flash(type==="in"?"✓ Entrada registrada":"✓ Salida registrada");setPhoto(null);loadData();};
 
   // Unread counts
-  const unreadMsgs=0;
+  const unreadMsgs=user?messages.filter(m=>m.to===user.id&&!m.read).length:0;
   const unreadAnns=user?announcements.filter(a=>!a.readBy?.includes(user.id)).length:0;
 
   const Toast=toast&&<div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:999,padding:"10px 24px",borderRadius:12,fontWeight:600,fontSize:13,fontFamily:font,pointerEvents:"none",background:toast.ok?"#f0fdf4":"#fef2f2",color:toast.ok?C.green:C.red,border:`1px solid ${toast.ok?"#16a34a33":"#dc262633"}`,boxShadow:"0 4px 12px #0002"}}>{toast.msg}</div>;
@@ -193,8 +193,7 @@ export default function App(){
   if(view==="login")return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:400,margin:"0 auto",padding:20,minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",gap:24,animation:"fadeUp .4s"}}>
     <div style={{textAlign:"center"}}><div style={{fontFamily:font,fontSize:13,color:C.accent,letterSpacing:5,marginBottom:8}}>ARESO</div><div style={{fontSize:26,fontWeight:700}}>Iniciar sesión</div></div>
     <div style={{display:"flex",flexDirection:"column",gap:12}}><input placeholder="Nombre" value={loginForm.email} onChange={e=>setLoginForm({...loginForm,email:e.target.value})} style={ss.input}/><input placeholder="Contraseña" type="password" value={loginForm.pin} onChange={e=>setLoginForm({...loginForm,pin:e.target.value})} style={ss.input} onKeyDown={e=>e.key==="Enter"&&handleLogin()}/><button onClick={handleLogin} style={ss.btn(C.accent,"#000")}>Entrar</button></div>
-    <button onClick={()=>setView("register")} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,textDecoration:"underline"}}>¿No tienes cuenta? Regístrate</button>
-    <div style={{borderTop:`1px solid ${C.border}`,paddingTop:20,textAlign:"center"}}><button onClick={()=>{setView("admin-login");setAdminPin("");}} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 20px",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,width:"100%"}}>🔒 Acceder como administrador</button></div>
+    <button onClick={()=>{setView("admin-login");setAdminPin("");}} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 20px",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,width:"100%"}}>🔒 Acceder como administrador</button>
   </div></div>);
 
   // ═══ REGISTER ═══
@@ -221,7 +220,7 @@ export default function App(){
 
   // ═══ ADMIN PANEL ═══
   if(view==="admin"){
-    const tabs=[{id:"live",l:"📡 Directo"},{id:"calendar",l:"📅 Horarios"},{id:"monthly",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"docs",l:"📎 Docs"},{id:"export",l:"📥 Exportar"}];
+    const tabs=[{id:"live",l:"📡 Directo"},{id:"calendar",l:"📅 Horarios"},{id:"monthly",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:600,margin:"0 auto",padding:"16px 16px 24px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
@@ -329,11 +328,34 @@ export default function App(){
       </div>}
 
       {/* EMPLOYEES */}
-      {adminTab==="employees"&&<div style={{display:"flex",flexDirection:"column",gap:6}}>
-        {employees.map(emp=><div key={emp.id} style={{...ss.statusCard,opacity:emp.active?1:0.4}}>
+      {adminTab==="employees"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {/* Add employee form */}
+        <div style={{...ss.card}}>
+          <div style={ss.label}>Crear trabajador</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:8}}>
+            <input placeholder="Nombre completo *" id="adm-emp-name" style={ss.input}/>
+            <input placeholder="Email" id="adm-emp-email" style={ss.input}/>
+            <input placeholder="Contraseña *" type="password" id="adm-emp-pass" style={ss.input}/>
+            <div style={{display:"flex",gap:8}}>
+              <input placeholder="Puesto" id="adm-emp-pos" style={{...ss.input,flex:1}}/>
+              <input placeholder="Teléfono" id="adm-emp-phone" style={{...ss.input,flex:1}}/>
+            </div>
+            <div><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:4}}>Fecha de nacimiento</div><input type="date" id="adm-emp-bday" style={ss.input}/></div>
+            <button onClick={async()=>{const n=document.getElementById("adm-emp-name").value;const p=document.getElementById("adm-emp-pass").value;if(!n||!p)return flash("Nombre y contraseña obligatorios",false);const emp=await DB.addEmployee({name:n,email:document.getElementById("adm-emp-email").value,pin:p,position:document.getElementById("adm-emp-pos").value,phone:document.getElementById("adm-emp-phone").value,birthday:document.getElementById("adm-emp-bday").value,role:"employee"});if(emp){setEmployees([...employees,emp]);document.getElementById("adm-emp-name").value="";document.getElementById("adm-emp-email").value="";document.getElementById("adm-emp-pass").value="";document.getElementById("adm-emp-pos").value="";document.getElementById("adm-emp-phone").value="";document.getElementById("adm-emp-bday").value="";flash("Trabajador creado");}else flash("Error",false);}} style={ss.btn(C.accent,"#fff")}>+ Crear trabajador</button>
+          </div>
+        </div>
+        {/* Employee list */}
+        <div style={ss.label}>Equipo</div>
+        {employees.map(emp=><div key={emp.id} style={{...ss.statusCard,opacity:emp.active?1:0.5}}>
           <div style={ss.avatar(getAvatarColor(emp.id),36)}>{emp.name[0]}</div>
-          <div style={{flex:1}}><div style={{fontWeight:600,fontSize:14}}>{emp.name}</div><div style={{fontFamily:font,fontSize:10,color:C.dim}}>{emp.position} · {emp.email}</div></div>
-          <button onClick={async()=>{await DB.updateEmployee(emp.id,{active:!emp.active});setEmployees(employees.map(e=>e.id===emp.id?{...e,active:!e.active}:e));}} style={{fontFamily:font,fontSize:9,padding:"4px 8px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,background:emp.active?"#f0fdf4":"#fef2f2",color:emp.active?C.green:C.red}}>{emp.active?"ON":"OFF"}</button>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:600,fontSize:14}}>{emp.name}{emp.sickLeave&&<span style={{fontFamily:font,fontSize:9,color:C.red,marginLeft:6}}>🏥 BAJA</span>}</div>
+            <div style={{fontFamily:font,fontSize:10,color:C.dim}}>{emp.position} · {emp.email}</div>
+          </div>
+          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+            <button onClick={async()=>{await DB.updateEmployee(emp.id,{sick_leave:!emp.sickLeave});setEmployees(employees.map(e=>e.id===emp.id?{...e,sickLeave:!e.sickLeave}:e));flash(emp.sickLeave?"Baja quitada":"Marcado de baja");}} style={{fontFamily:font,fontSize:8,padding:"4px 6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,background:emp.sickLeave?"#fef2f2":"#fff7ed",color:emp.sickLeave?C.red:C.orange}}>{emp.sickLeave?"🏥 Baja":"🏥"}</button>
+            <button onClick={async()=>{await DB.updateEmployee(emp.id,{active:!emp.active});setEmployees(employees.map(e=>e.id===emp.id?{...e,active:!e.active}:e));}} style={{fontFamily:font,fontSize:8,padding:"4px 6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,background:emp.active?"#f0fdf4":"#fef2f2",color:emp.active?C.green:C.red}}>{emp.active?"ON":"OFF"}</button>
+          </div>
         </div>)}
       </div>}
 
