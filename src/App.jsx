@@ -25,6 +25,7 @@ const DB = {
   async getAnnouncements() { const {data}=await sb.from('areso_announcements').select('*').order('date',{ascending:false}); return (data||[]).map(a=>({id:a.id,title:a.title,body:a.body,date:new Date(a.date).getTime(),readBy:a.read_by||[]})); },
   async addAnnouncement(ann) { await sb.from('areso_announcements').insert({title:ann.title,body:ann.body}); },
   async deleteAnnouncement(id) { await sb.from('areso_announcements').delete().eq('id',id); },
+  async deleteEmployee(id) { await sb.from('areso_employees').delete().eq('id',id); },
   async markAnnouncementRead(id,userId) { const {data}=await sb.from('areso_announcements').select('read_by').eq('id',id).single(); const readBy=[...(data?.read_by||[]),userId]; await sb.from('areso_announcements').update({read_by:readBy}).eq('id',id); },
 };
 
@@ -445,6 +446,7 @@ export default function App(){
           <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
             <button onClick={async()=>{await DB.updateEmployee(emp.id,{sick_leave:!emp.sickLeave});setEmployees(employees.map(e=>e.id===emp.id?{...e,sickLeave:!e.sickLeave}:e));flash(emp.sickLeave?"Baja quitada":"Marcado de baja");}} style={{fontFamily:font,fontSize:8,padding:"4px 6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,background:emp.sickLeave?"#fef2f2":"#fff7ed",color:emp.sickLeave?C.red:C.orange}}>{emp.sickLeave?"🏥 Baja":"🏥"}</button>
             <button onClick={async()=>{await DB.updateEmployee(emp.id,{active:!emp.active});setEmployees(employees.map(e=>e.id===emp.id?{...e,active:!e.active}:e));}} style={{fontFamily:font,fontSize:8,padding:"4px 6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,background:emp.active?"#f0fdf4":"#fef2f2",color:emp.active?C.green:C.red}}>{emp.active?"ON":"OFF"}</button>
+            <button onClick={async()=>{if(!window.confirm(`¿Borrar a ${emp.name}?`))return;await DB.deleteEmployee(emp.id);setEmployees(employees.filter(e=>e.id!==emp.id));flash("Trabajador eliminado");}} style={{fontFamily:font,fontSize:8,padding:"4px 6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,background:"#fef2f2",color:C.red}}>🗑</button>
           </div>
         </div>)}
       </div>}
