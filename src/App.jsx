@@ -95,13 +95,84 @@ const ss={
 
 const CSS=<style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}input:focus,select:focus,textarea:focus{outline:none;border-color:${C.accent}!important}@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}video{border-radius:12px;width:100%}body{background:${C.bg}}::selection{background:${C.accent}22;color:${C.accent}}.profile-card:hover{transform:translateY(-3px) scale(1.03);}.profile-card:active{transform:scale(0.97);}`}</style>;
 
-function generateReport(employees,records,schedules,vacations,documents,f,t){
-  let csv="\ufeffINFORME ARESO\nPeriodo: "+f+" a "+t+"\nGenerado: "+new Date().toLocaleString("es-ES")+"\n\n";
-  csv+="RESUMEN POR EMPLEADO\nNombre,Puesto,Estado,Días,Horas totales,Media\n";
-  employees.filter(e=>e.active).forEach(emp=>{let ms=0,days=0;const d1=new Date(f),d2=new Date(t);for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){const w=getWorked(records,emp.id,dateKey(d));if(w>0){ms+=w;days++;}}const estado=emp.sickLeave?"DE BAJA":"Activo";csv+=`${emp.name},${emp.position||"—"},${estado},${days},${fmtDur(ms)},${days?fmtDur(ms/days):"—"}\n`;});
-  csv+="\nFICHAJES\nFecha,Hora,Empleado,Tipo\n";Object.keys(records).filter(d=>d>=f&&d<=t).sort().forEach(d=>(records[d]||[]).sort((a,b)=>a.time-b.time).forEach(r=>{const emp=employees.find(e=>e.id===r.empId);csv+=`${d},${fmtTime(r.time)},${emp?.name||"?"},${r.type==="in"?"Entrada":"Salida"}\n`;}));
-  csv+="\nHORARIOS\nEmpleado,Día,Entrada,Salida\n";employees.filter(e=>e.active).forEach(emp=>DAYS.forEach((day,i)=>{const s=schedules[emp.id+"_"+i];if(s)csv+=`${emp.name},${day},${s.start},${s.end}\n`;}));
-  csv+="\nVACACIONES\nEmpleado,Desde,Hasta,Estado\n";vacations.forEach(v=>{const emp=employees.find(e=>e.id===v.empId);csv+=`${emp?.name},${v.start},${v.end},${v.status}\n`;});
+function generateReport(employees,records,schedules,vacations,f,t){
+  // Build data per employee for the period
+  const d1=new Date(f),d2=new Date(t);
+  const empData=employees.filter(e=>e.active).map(emp=>{
+    let totalMs=0,days=0;
+    const dailyRows=[];
+    for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){
+      const dk=dateKey(d);
+      const dayMs=getWorked(records,emp.id,dk);
+      const dayRecs=(records[dk]||[]).filter(r=>r.empId===emp.id).sort((a,b)=>a.time-b.time);
+      if(dayMs>0||dayRecs.length>0){
+        totalMs+=dayMs; days++;
+        // find first in and last out
+        const firstIn=dayRecs.find(r=>r.type==="in");
+        const lastOut=[...dayRecs].reverse().find(r=>r.type==="out");
+        dailyRows.push({date:dk,entrada:firstIn?fmtTime(firstIn.time):"—",salida:lastOut?fmtTime(lastOut.time):"—",horas:fmtDur(dayMs)});
+      }
+    }
+    return{emp,totalMs,days,media:days?totalMs/days:0,dailyRows};
+  }).filter(x=>x.totalMs>0||x.dailyRows.length>0);
+
+  // CSV with clear sections
+  let csv="﻿";
+  csv+="INFORME ARESO
+";
+  csv+="Período:,"+f+" → "+t+"
+";
+  csv+="Generado:,"+new Date().toLocaleDateString("es-ES",{weekday:"long",year:"numeric",month:"long",day:"numeric"})+"
+
+";
+
+  // Section 1: Summary
+  csv+="=== RESUMEN POR TRABAJADOR ===
+";
+  csv+="Trabajador,Puesto,Estado,Días trabajados,Horas totales,Media diaria
+";
+  empData.forEach(({emp,totalMs,days,media})=>{
+    const estado=emp.sickLeave?"DE BAJA":"Activo";
+    csv+=`"${emp.name}","${emp.position||"—"}",${estado},${days},${fmtDur(totalMs)},${days?fmtDur(media):"—"}
+`;
+  });
+
+  // Section 2: Daily detail per employee
+  csv+="
+=== DETALLE DIARIO POR TRABAJADOR ===
+";
+  empData.forEach(({emp,totalMs,days,dailyRows})=>{
+    csv+=`
+${emp.name} — ${emp.position||""}
+`;
+    csv+="Fecha,Día,Entrada,Salida,Horas
+";
+    dailyRows.forEach(row=>{
+      const d=new Date(row.date);
+      const dayName=DAYS[(d.getDay()+6)%7];
+      csv+=`${row.date},${dayName},${row.entrada},${row.salida},${row.horas}
+`;
+    });
+    csv+=`,,,,TOTAL: ${fmtDur(totalMs)} (${days} días — media ${days?fmtDur(totalMs/days):"—"})
+`;
+  });
+
+  // Section 3: Vacations
+  const vacs=vacations.filter(v=>v.start<=t&&v.end>=f);
+  if(vacs.length){
+    csv+="
+=== VACACIONES ===
+";
+    csv+="Trabajador,Desde,Hasta,Estado
+";
+    vacs.forEach(v=>{
+      const emp=employees.find(e=>e.id===v.empId);
+      const estado=v.status==="approved"?"Aprobada":v.status==="pending"?"Pendiente":"Rechazada";
+      csv+=`"${emp?.name||"?"}",${v.start},${v.end},${estado}
+`;
+    });
+  }
+
   return csv;
 }
 
@@ -627,7 +698,7 @@ export default function App(){
           <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
             {[{l:"Esta semana",fn:()=>{const n=new Date();const d=n.getDay()||7;const m=new Date(n);m.setDate(n.getDate()-(d-1));setExportFrom(dateKey(m));setExportTo(dateKey());}},{l:"Este mes",fn:()=>{const n=new Date();setExportFrom(n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-01");setExportTo(dateKey());}},{l:"Mes pasado",fn:()=>{const n=new Date();n.setMonth(n.getMonth()-1);setExportFrom(dateKey(new Date(n.getFullYear(),n.getMonth(),1)));setExportTo(dateKey(new Date(n.getFullYear(),n.getMonth()+1,0)));}}].map(r=><button key={r.l} onClick={r.fn} style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:10}}>{r.l}</button>)}
           </div>
-          <button onClick={()=>{const csv=generateReport(employees,records,schedules,vacations,documents,exportFrom,exportTo);const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`ARESO_${exportFrom}_${exportTo}.csv`;a.click();flash("Descargado");}} style={ss.btn(C.accent,"#000")}>📥 Descargar informe</button>
+          <button onClick={()=>{const csv=generateReport(employees,records,schedules,vacations,exportFrom,exportTo);const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`ARESO_Informe_${exportFrom}_${exportTo}.csv`;a.click();flash("Descargado");}} style={ss.btn(C.accent,"#000")}>📥 Descargar informe</button>
         </div>
       </div>}
 
