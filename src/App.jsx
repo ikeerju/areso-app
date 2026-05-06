@@ -30,7 +30,7 @@ const DB = {
 
 const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 const MONTHS=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-const ADMIN_PIN="admin";
+const ADMIN_PIN="0000";
 const fmtTime=d=>new Date(d).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"});
 const fmtDate=d=>new Date(d).toLocaleDateString("es-ES",{day:"numeric",month:"short"});
 const fmtDateLong=d=>new Date(d).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"short"});
@@ -112,7 +112,7 @@ function PinKeypad({ value, onChange, onConfirm, onClose, error, name, color, ph
     else if (k !== "" && value.length < 4) {
       const next = value + k;
       onChange(next);
-      if (next.length === 4) setTimeout(onConfirm, 120);
+      if (next.length === 4) setTimeout(onConfirm, 200);
     }
   };
   return (
