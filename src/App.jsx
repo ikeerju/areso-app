@@ -142,7 +142,7 @@ function PinKeypad({ value, onChange, onConfirm, onClose, error, name, color, ph
             >{k}</button>
           ))}
         </div>
-        <button onClick={onConfirm} style={{width:"100%",marginTop:14,height:52,borderRadius:14,background:value.length>0?C.accent:"rgba(255,255,255,.12)",border:"none",color:value.length>0?"#fff":"rgba(255,255,255,.3)",fontFamily:font,fontSize:15,fontWeight:700,cursor:value.length>0?"pointer":"default",transition:"all .2s"}}>
+        <button onClick={()=>onConfirm(value)} style={{width:"100%",marginTop:14,height:52,borderRadius:14,background:value.length>0?C.accent:"rgba(255,255,255,.12)",border:"none",color:value.length>0?"#fff":"rgba(255,255,255,.3)",fontFamily:font,fontSize:15,fontWeight:700,cursor:value.length>0?"pointer":"default",transition:"all .2s"}}>
           Entrar
         </button>
         <button onClick={onClose} style={{width:"100%",marginTop:8,height:36,borderRadius:10,background:"transparent",border:"none",color:"rgba(255,255,255,.3)",fontFamily:font,fontSize:12,cursor:"pointer"}}>
@@ -180,23 +180,23 @@ function ProfileSelector({ employees, onLogin, onAdminLogin, loading }) {
   };
 
   if (loading) return (
-    <div style={{minHeight:"100vh",background:"#080a14",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font}}>
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font}}>
       {CSS}
       <div style={{textAlign:"center"}}>
         <div style={{fontFamily:font,fontSize:13,color:C.accent,letterSpacing:5,marginBottom:12}}>ARESO</div>
-        <div style={{fontFamily:font,fontSize:13,color:"rgba(255,255,255,.4)"}}>Cargando...</div>
+        <div style={{fontFamily:font,fontSize:13,color:C.muted}}>Cargando...</div>
       </div>
     </div>
   );
 
   return (
-    <div style={{minHeight:"100vh",background:"#080a14",color:"#fff",fontFamily:fontBody,paddingBottom:40}}>
+    <div style={{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:fontBody,paddingBottom:40}}>
       {CSS}
       {/* Header */}
       <div style={{padding:"48px 24px 28px",textAlign:"center"}}>
         <div style={{fontFamily:font,fontSize:10,letterSpacing:6,color:C.accent,marginBottom:10}}>ARESO</div>
         <div style={{fontSize:24,fontWeight:700}}>¿Quién eres?</div>
-        <div style={{fontFamily:font,fontSize:12,color:"rgba(255,255,255,.35)",marginTop:6}}>Selecciona tu perfil para continuar</div>
+        <div style={{fontFamily:font,fontSize:12,color:C.muted,marginTop:6}}>Selecciona tu perfil para continuar</div>
       </div>
 
       {/* Grid */}
@@ -205,21 +205,21 @@ function ProfileSelector({ employees, onLogin, onAdminLogin, loading }) {
           const color = getAvatarColor(emp.id);
           return (
             <div key={emp.id} className="profile-card" onClick={()=>handleSelect(emp)}
-              style={{display:"flex",flexDirection:"column",alignItems:"center",gap:9,cursor:"pointer",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:18,padding:"16px 8px",transition:"transform .2s, background .15s"}}>
+              style={{display:"flex",flexDirection:"column",alignItems:"center",gap:9,cursor:"pointer",background:C.card,border:`1px solid ${C.border}`,borderRadius:18,padding:"16px 8px",transition:"transform .2s, background .15s",boxShadow:"0 1px 3px #0001"}}>
               <div style={{width:54,height:54,borderRadius:"50%",background:color+"33",border:`2.5px solid ${color}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:emp.photo?0:20,fontWeight:700,color,overflow:"hidden",flexShrink:0}}>
                 {emp.photo ? <img src={emp.photo} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}
               </div>
-              <div style={{fontFamily:font,fontSize:12,fontWeight:600,color:"#fff",textAlign:"center",lineHeight:1.3,wordBreak:"break-word"}}>{emp.name.split(" ")[0]}</div>
-              {emp.position && <div style={{fontFamily:font,fontSize:9,color:"rgba(255,255,255,.35)",textAlign:"center"}}>{emp.position}</div>}
+              <div style={{fontFamily:font,fontSize:12,fontWeight:600,color:C.text,textAlign:"center",lineHeight:1.3,wordBreak:"break-word"}}>{emp.name.split(" ")[0]}</div>
+              {emp.position && <div style={{fontFamily:font,fontSize:9,color:C.muted,textAlign:"center"}}>{emp.position}</div>}
             </div>
           );
         })}
         {/* Admin tile */}
         <div className="profile-card" onClick={()=>handleSelect({isAdmin:true,name:"Admin"})}
-          style={{display:"flex",flexDirection:"column",alignItems:"center",gap:9,cursor:"pointer",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:18,padding:"16px 8px",transition:"transform .2s, background .15s"}}>
+          style={{display:"flex",flexDirection:"column",alignItems:"center",gap:9,cursor:"pointer",background:C.card,border:`1px solid ${C.border}`,borderRadius:18,padding:"16px 8px",transition:"transform .2s, background .15s",boxShadow:"0 1px 3px #0001"}}>
           <div style={{width:54,height:54,borderRadius:"50%",background:"#7c3aed33",border:"2.5px solid #7c3aed",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔒</div>
-          <div style={{fontFamily:font,fontSize:12,fontWeight:600,color:"#fff"}}>Admin</div>
-          <div style={{fontFamily:font,fontSize:9,color:"rgba(255,255,255,.35)"}}>Administrador</div>
+          <div style={{fontFamily:font,fontSize:12,fontWeight:600,color:C.text}}>Admin</div>
+          <div style={{fontFamily:font,fontSize:9,color:C.muted}}>Administrador</div>
         </div>
       </div>
 
