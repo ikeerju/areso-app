@@ -30,7 +30,7 @@ const DB = {
 
 const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 const MONTHS=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-const ADMIN_PIN="0000";
+const ADMIN_PIN="admin";
 const fmtTime=d=>new Date(d).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"});
 const fmtDate=d=>new Date(d).toLocaleDateString("es-ES",{day:"numeric",month:"short"});
 const fmtDateLong=d=>new Date(d).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"short"});
@@ -112,7 +112,7 @@ function PinKeypad({ value, onChange, onConfirm, onClose, error, name, color, ph
     else if (k !== "" && value.length < 4) {
       const next = value + k;
       onChange(next);
-      if (next.length === 4) setTimeout(onConfirm, 200);
+      if (next.length === 4) setTimeout(() => onConfirm(next), 120);
     }
   };
   return (
@@ -167,13 +167,14 @@ function ProfileSelector({ employees, onLogin, onAdminLogin, loading }) {
     setPinErr(false);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = (overridePin) => {
+    const pin = overridePin !== undefined ? overridePin : pinVal;
     if (!selected) return;
     if (selected.isAdmin) {
-      if (pinVal === ADMIN_PIN) { onAdminLogin(); }
+      if (pin === ADMIN_PIN) { onAdminLogin(); }
       else { setPinErr(true); setPinVal(""); setTimeout(()=>setPinErr(false),900); }
     } else {
-      if (pinVal === selected.pin) { onLogin(selected); }
+      if (pin === selected.pin) { onLogin(selected); }
       else { setPinErr(true); setPinVal(""); setTimeout(()=>setPinErr(false),900); }
     }
   };
