@@ -31,7 +31,7 @@ const DB = {
 };
 const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 const MONTHS=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-const ADMIN_PIN="0000";
+const ADMIN_PIN="admin";
 const fmtTime=d=>new Date(d).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"});
 const fmtDate=d=>new Date(d).toLocaleDateString("es-ES",{day:"numeric",month:"short"});
 const fmtDateLong=d=>new Date(d).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"short"});
@@ -208,7 +208,7 @@ export default function App(){
       if(next.length>=1&&loginSelEmp){
         const match=employees.find(e=>e.id===loginSelEmp.id&&e.pin===next);
         if(match){setUser(match);setView("app");setPage("menu");setSub(null);setLoginPin("");setLoginSelEmp(null);}
-        else if(next.length===4){flash("PIN incorrecto",false);setLoginPin("");}
+        else if(next.length===6){flash("PIN incorrecto",false);setLoginPin("");}
       }
     };
     return(<div style={{...ss.page,minHeight:"100vh",display:"flex",flexDirection:"column"}}>{CSS}{Toast}
@@ -272,11 +272,36 @@ export default function App(){
   </div></div>);
 
   // ═══ ADMIN LOGIN ═══
-  if(view==="admin-login")return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:400,margin:"0 auto",padding:20,minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",gap:24,animation:"fadeUp .4s"}}>
-    <div style={{textAlign:"center"}}><div style={{display:"flex",justifyContent:"center",marginBottom:12}}><AresoLogo size={44} color={C.accent}/></div><div style={{fontFamily:font,fontSize:22,fontWeight:700,marginBottom:4}}>Administrador</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>Contraseña: admin</div></div>
-    <div style={{display:"flex",flexDirection:"column",gap:12}}><input type="password" placeholder="Contraseña admin" value={adminPin} onChange={e=>setAdminPin(e.target.value)} style={ss.input} onKeyDown={e=>e.key==="Enter"&&(adminPin===ADMIN_PIN?(setView("admin"),setAdminTab("live")):flash("Contraseña incorrecta",false))}/><button onClick={()=>adminPin===ADMIN_PIN?(setView("admin"),setAdminTab("live")):flash("Contraseña incorrecta",false)} style={ss.btn(C.accent,"#000")}>Entrar</button></div>
-    <button onClick={()=>setView("login")} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,textDecoration:"underline"}}>← Volver</button>
-  </div></div>);
+  if(view==="admin-login")return(<div style={{...ss.page,minHeight:"100vh",display:"flex",flexDirection:"column"}}>{CSS}{Toast}
+    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",animation:"popIn .25s"}}>
+      <div style={{background:`linear-gradient(160deg,#1e40af,#2d5be3 60%,#3b82f6)`,width:"100%",padding:"36px 20px 32px",borderRadius:"0 0 32px 32px",textAlign:"center"}}>
+        <div style={{width:68,height:68,borderRadius:"50%",background:"rgba(255,255,255,.15)",border:"3px solid rgba(255,255,255,.4)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px"}}><AresoLogo size={36} color="white"/></div>
+        <div style={{fontFamily:font,fontSize:20,fontWeight:700,color:"#fff"}}>Administrador</div>
+        <div style={{fontFamily:font,fontSize:10,color:"#ffffff88",marginTop:4}}>Panel de gestión</div>
+      </div>
+      <div style={{padding:"28px 32px 0",width:"100%",maxWidth:360}}>
+        <div style={{fontFamily:font,fontSize:11,color:C.muted,textAlign:"center",marginBottom:20,letterSpacing:2}}>INTRODUCE EL PIN</div>
+        <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:28}}>
+          {[0,1,2,3].map(i=><div key={i} style={{width:14,height:14,borderRadius:"50%",background:adminPin.length>i?C.accent:C.border,transition:"background .15s"}}/>)}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+          {["1","2","3","4","5","6","7","8","9","","0","del"].map((d,i)=>(
+            <button key={i} onClick={()=>{
+              if(!d)return;
+              if(d==="del"){setAdminPin(p=>p.slice(0,-1));return;}
+              const next=adminPin+d;
+              setAdminPin(next);
+              if(next.length===4){
+                if(next===ADMIN_PIN){setView("admin");setAdminTab("live");}
+                else{flash("PIN incorrecto",false);setAdminPin("");}
+              }
+            }} style={{height:60,borderRadius:14,border:`1px solid ${C.border}`,background:d===""?"transparent":C.card,color:d==="del"?C.red:C.text,fontFamily:font,fontSize:d==="del"?18:22,fontWeight:600,cursor:d?"pointer":"default",boxShadow:d?"0 2px 6px #0001":"none",transition:"all .1s"}}>{d==="del"?"⌫":d}</button>
+          ))}
+        </div>
+      </div>
+      <button onClick={()=>setView("login")} style={{marginTop:24,background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,textDecoration:"underline"}}>← Volver</button>
+    </div>
+  </div>);
 
   // ═══ ADMIN PANEL ═══
   if(view==="admin"){
@@ -319,13 +344,13 @@ export default function App(){
           </div>
 
           {/* Calendar grid */}
-          <div style={{overflowX:"auto"}}>
-            <div style={{display:"grid",gridTemplateColumns:`100px repeat(7, 1fr)`,gap:2,minWidth:600}}>
+          <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+            <div style={{display:"grid",gridTemplateColumns:`72px repeat(7, minmax(44px,1fr))`,gap:2,minWidth:420}}>
               {/* Header row */}
               <div style={{padding:8}}/>
-              {weekDays.map(d=><div key={d.date} style={{padding:"8px 4px",textAlign:"center",background:d.date===dateKey()?C.accent+"22":C.cardLight,borderRadius:8}}>
-                <div style={{fontFamily:font,fontSize:10,color:d.date===dateKey()?C.accent:C.muted}}>{d.label}</div>
-                <div style={{fontFamily:font,fontSize:16,fontWeight:700,color:d.date===dateKey()?C.accent:C.text}}>{d.num}</div>
+              {weekDays.map(d=><div key={d.date} style={{padding:"6px 2px",textAlign:"center",background:d.date===dateKey()?C.accent+"22":C.cardLight,borderRadius:8}}>
+                <div style={{fontFamily:font,fontSize:9,color:d.date===dateKey()?C.accent:C.muted}}>{d.label}</div>
+                <div style={{fontFamily:font,fontSize:13,fontWeight:700,color:d.date===dateKey()?C.accent:C.text}}>{d.num}</div>
               </div>)}
               {/* Employee rows + inline form */}
               {activeEmps.map(emp=>{const col=getAvatarColor(emp.id);const isAdding=addShift?.empId===emp.id;const isConfirmingDelete=confirmDelete?.empId===emp.id;return(<React.Fragment key={emp.id}>
@@ -608,14 +633,14 @@ export default function App(){
         </div>
         {/* Team view */}
         <div style={ss.secTitle}>Equipo esta semana</div>
-        <div style={{overflowX:"auto"}}>
-          <div style={{display:"grid",gridTemplateColumns:`80px repeat(7,1fr)`,gap:2,minWidth:500}}>
+        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+          <div style={{display:"grid",gridTemplateColumns:`64px repeat(7,minmax(36px,1fr))`,gap:2,minWidth:360}}>
             <div/>
-            {weekDays.map(d=><div key={d.date} style={{textAlign:"center",padding:4}}><div style={{fontFamily:font,fontSize:9,color:d.date===dateKey()?C.accent:C.muted}}>{d.label}</div><div style={{fontFamily:font,fontSize:12,fontWeight:700,color:d.date===dateKey()?C.accent:C.text}}>{d.num}</div></div>)}
+            {weekDays.map(d=><div key={d.date} style={{textAlign:"center",padding:4}}><div style={{fontFamily:font,fontSize:8,color:d.date===dateKey()?C.accent:C.muted}}>{d.label}</div><div style={{fontFamily:font,fontSize:11,fontWeight:700,color:d.date===dateKey()?C.accent:C.text}}>{d.num}</div></div>)}
             {employees.filter(e=>e.active).map(emp=>{const ec=getAvatarColor(emp.id);return(<React.Fragment key={emp.id}>
-              <div style={{display:"flex",alignItems:"center",gap:4,padding:"2px 0"}}><div style={ss.avatar(ec,22)}>{emp.name[0]}</div><span style={{fontFamily:font,fontSize:8,color:C.muted}}>{emp.name.split(" ")[0]}</span></div>
+              <div style={{display:"flex",alignItems:"center",gap:3,padding:"2px 0"}}><div style={ss.avatar(ec,20)}>{emp.name[0]}</div><span style={{fontFamily:font,fontSize:7,color:C.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span></div>
               {weekDays.map(d=>{const s=schedules[emp.id+"_"+d.date];return(<div key={d.date} style={{padding:2,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                {s?<div style={{background:ec+"33",borderRadius:4,padding:"2px 4px",width:"100%",textAlign:"center"}}><div style={{fontFamily:font,fontSize:8,color:ec,fontWeight:700}}>{s.start}</div></div>:<div style={{fontFamily:font,fontSize:10,color:C.dim}}>·</div>}
+                {s?<div style={{background:ec+"33",borderRadius:4,padding:"2px 2px",width:"100%",textAlign:"center"}}><div style={{fontFamily:font,fontSize:7,color:ec,fontWeight:700,whiteSpace:"nowrap"}}>{s.start}</div></div>:<div style={{fontFamily:font,fontSize:10,color:C.dim}}>·</div>}
               </div>);})}
             </React.Fragment>);})}
           </div>
