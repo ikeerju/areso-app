@@ -31,7 +31,7 @@ const DB = {
 };
 const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 const MONTHS=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-const ADMIN_PIN="admin";
+const ADMIN_PIN="0000";
 const fmtTime=d=>new Date(d).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"});
 const fmtDate=d=>new Date(d).toLocaleDateString("es-ES",{day:"numeric",month:"short"});
 const fmtDateLong=d=>new Date(d).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"short"});
@@ -208,7 +208,7 @@ export default function App(){
       if(next.length>=1&&loginSelEmp){
         const match=employees.find(e=>e.id===loginSelEmp.id&&e.pin===next);
         if(match){setUser(match);setView("app");setPage("menu");setSub(null);setLoginPin("");setLoginSelEmp(null);}
-        else if(next.length===6){flash("PIN incorrecto",false);setLoginPin("");}
+        else if(next.length===4){flash("PIN incorrecto",false);setLoginPin("");}
       }
     };
     return(<div style={{...ss.page,minHeight:"100vh",display:"flex",flexDirection:"column"}}>{CSS}{Toast}
