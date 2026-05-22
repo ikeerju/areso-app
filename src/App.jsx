@@ -279,37 +279,7 @@ export default function App(){
     <button onClick={()=>setView("login")} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,textDecoration:"underline"}}>Ya tengo cuenta</button>
   </div></div>);
 
-  // ═══ ADMIN LOGIN ═══
-  if(view==="admin-login")return(<div style={{...ss.page,minHeight:"100vh",display:"flex",flexDirection:"column"}}>{CSS}{Toast}
-    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",animation:"popIn .25s"}}>
-      <div style={{background:`linear-gradient(160deg,#1e40af,#2d5be3 60%,#3b82f6)`,width:"100%",padding:"36px 20px 32px",borderRadius:"0 0 32px 32px",textAlign:"center"}}>
-        <div style={{width:68,height:68,borderRadius:"50%",background:"rgba(255,255,255,.15)",border:"3px solid rgba(255,255,255,.4)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px"}}><AresoLogo size={36} color="white"/></div>
-        <div style={{fontFamily:font,fontSize:20,fontWeight:700,color:"#fff"}}>Administrador</div>
-        <div style={{fontFamily:font,fontSize:10,color:"#ffffff88",marginTop:4}}>Panel de gestión</div>
-      </div>
-      <div style={{padding:"28px 32px 0",width:"100%",maxWidth:360}}>
-        <div style={{fontFamily:font,fontSize:11,color:C.muted,textAlign:"center",marginBottom:20,letterSpacing:2}}>INTRODUCE EL PIN</div>
-        <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:28}}>
-          {[0,1,2,3].map(i=><div key={i} style={{width:14,height:14,borderRadius:"50%",background:adminPin.length>i?C.accent:C.border,transition:"background .15s"}}/>)}
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
-          {["1","2","3","4","5","6","7","8","9","","0","del"].map((d,i)=>(
-            <button key={i} onClick={()=>{
-              if(!d)return;
-              if(d==="del"){setAdminPin(p=>p.slice(0,-1));return;}
-              const next=adminPin+d;
-              setAdminPin(next);
-              if(next.length===4){
-                if(next===ADMIN_PIN){setView("admin");setAdminTab("live");}
-                else{flash("PIN incorrecto",false);setAdminPin("");}
-              }
-            }} style={{height:60,borderRadius:14,border:`1px solid ${C.border}`,background:d===""?"transparent":C.card,color:d==="del"?C.red:C.text,fontFamily:font,fontSize:d==="del"?18:22,fontWeight:600,cursor:d?"pointer":"default",boxShadow:d?"0 2px 6px #0001":"none",transition:"all .1s"}}>{d==="del"?"⌫":d}</button>
-          ))}
-        </div>
-      </div>
-      <button onClick={()=>setView("login")} style={{marginTop:24,background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,textDecoration:"underline"}}>← Volver</button>
-    </div>
-  </div>);
+
 
   // ═══ ADMIN PANEL ═══
   if(view==="admin"){
