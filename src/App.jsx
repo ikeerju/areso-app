@@ -10,6 +10,7 @@ const DB = {
   async getEmployees() { const {data}=await sb.from('areso_employees').select('*').order('created_at'); return (data||[]).map(e=>({id:e.id,name:e.name,email:e.email,pin:e.password,position:e.position,phone:e.phone,birthday:e.birthday,role:e.role,active:e.active,sickLeave:e.sick_leave||false,created:e.created_at})); },
   async addEmployee(emp) { const {data}=await sb.from('areso_employees').insert({name:emp.name,email:emp.email,password:emp.pin,position:emp.position,phone:emp.phone,birthday:emp.birthday||null,role:emp.role||'employee',active:true}).select().single(); return data?{id:data.id,name:data.name,email:data.email,pin:data.password,position:data.position,phone:data.phone,birthday:data.birthday,role:data.role,active:data.active,created:data.created_at}:null; },
   async updateEmployee(id,fields) { const dbFields={}; if('active' in fields)dbFields.active=fields.active; if('role' in fields)dbFields.role=fields.role; if('sick_leave' in fields)dbFields.sick_leave=fields.sick_leave; await sb.from('areso_employees').update(dbFields).eq('id',id); },
+  async updatePin(id,newPin) { await sb.from('areso_employees').update({password:newPin}).eq('id',id); },
   async getClockIns(dateFrom,dateTo) { const {data}=await sb.from('areso_clockins').select('*').gte('time',dateFrom).lte('time',dateTo+'T23:59:59').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:r.photo_url})); },
   async getAllClockIns() { const {data}=await sb.from('areso_clockins').select('*').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:r.photo_url})); },
   async addClockIn(rec) { await sb.from('areso_clockins').insert({employee_id:rec.empId,type:rec.type,time:new Date(rec.time).toISOString(),photo_url:rec.photo||null}); },
@@ -93,7 +94,9 @@ const ss={
   avatar:(color,size=40)=>({width:size,height:size,borderRadius:"50%",background:color+"22",border:`2px solid ${color}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:size*0.38,fontWeight:700,color,flexShrink:0}),
   badge:(bg,c)=>({position:"absolute",top:-4,right:-4,background:bg,color:c,fontFamily:font,fontSize:9,fontWeight:700,width:18,height:18,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}),
 };
-const CSS=<style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}input:focus,select:focus,textarea:focus{outline:none;border-color:${C.accent}!important}@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}video{border-radius:12px;width:100%}body{background:${C.bg}}::selection{background:${C.accent}22;color:${C.accent}}`}</style>;
+const AresoLogo=({size=32,color="#2d5be3"})=><svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" rx="10" fill={color}/><path d="M20 8L8 30h5l2.5-5h9l2.5 5h5L20 8zm0 6l3.2 7H16.8L20 14z" fill="white"/></svg>;
+
+const CSS=<style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}input:focus,select:focus,textarea:focus{outline:none;border-color:${C.accent}!important}@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes popIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}video{border-radius:12px;width:100%}body{background:${C.bg}}::selection{background:${C.accent}22;color:${C.accent}}::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:${C.dim};border-radius:4px}.profile-card:active{transform:scale(.96);transition:transform .1s}`}</style>;
 
 // Export
 function generateReport(employees,records,schedules,vacations,documents,f,t){
@@ -134,6 +137,8 @@ export default function App(){
   const [exportTo,setExportTo]=useState(dateKey());
 
   const [loginForm,setLoginForm]=useState({email:"",pin:""});
+  const [pinForm,setPinForm]=useState({current:"",newPin:"",confirm:""});
+  const [showPinChange,setShowPinChange]=useState(false);
   const [regForm,setRegForm]=useState({name:"",email:"",pin:"",position:"",phone:"",birthday:""});
   const [editSched,setEditSched]=useState(null);
   const [calWeekStart,setCalWeekStart]=useState(()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));return dateKey(n);});
@@ -189,13 +194,67 @@ export default function App(){
   const Toast=toast&&<div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:999,padding:"10px 24px",borderRadius:12,fontWeight:600,fontSize:13,fontFamily:font,pointerEvents:"none",background:toast.ok?"#f0fdf4":"#fef2f2",color:toast.ok?C.green:C.red,border:`1px solid ${toast.ok?"#16a34a33":"#dc262633"}`,boxShadow:"0 4px 12px #0002"}}>{toast.msg}</div>;
 
   // ═══ LOGIN ═══
-  if(loading)return(<div style={{...ss.page,display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}>{CSS}<div style={{textAlign:"center"}}><div style={{fontFamily:font,fontSize:13,color:C.accent,letterSpacing:5,marginBottom:12}}>ARESO</div><div style={{fontFamily:font,fontSize:13,color:C.muted}}>Cargando...</div></div></div>);
+  if(loading)return(<div style={{...ss.page,display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}>{CSS}<div style={{textAlign:"center",animation:"fadeUp .4s"}}><div style={{display:"flex",justifyContent:"center",marginBottom:12}}><AresoLogo size={52} color={C.accent}/></div><div style={{fontFamily:font,fontSize:20,fontWeight:700,color:C.accent,letterSpacing:3,marginBottom:8}}>ARESO</div><div style={{fontFamily:font,fontSize:12,color:C.muted}}>Cargando...</div></div></div>);
 
-  if(view==="login")return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:400,margin:"0 auto",padding:20,minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",gap:24,animation:"fadeUp .4s"}}>
-    <div style={{textAlign:"center"}}><div style={{fontFamily:font,fontSize:13,color:C.accent,letterSpacing:5,marginBottom:8}}>ARESO</div><div style={{fontSize:26,fontWeight:700}}>Iniciar sesión</div></div>
-    <div style={{display:"flex",flexDirection:"column",gap:12}}><input placeholder="Nombre" value={loginForm.email} onChange={e=>setLoginForm({...loginForm,email:e.target.value})} style={ss.input}/><input placeholder="Contraseña" type="password" value={loginForm.pin} onChange={e=>setLoginForm({...loginForm,pin:e.target.value})} style={ss.input} onKeyDown={e=>e.key==="Enter"&&handleLogin()}/><button onClick={handleLogin} style={ss.btn(C.accent,"#000")}>Entrar</button></div>
-    <button onClick={()=>{setView("admin-login");setAdminPin("");}} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 20px",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,width:"100%"}}>🔒 Acceder como administrador</button>
-  </div></div>);
+  // ═══ LOGIN — profile picker ═══
+  if(view==="login"){
+    const [selEmp,setSelEmp]=useState(null);
+    const [pinInput,setPinInput]=useState("");
+    const activeEmps=employees.filter(e=>e.active);
+    const handlePinKey=(digit)=>{
+      if(digit==="del"){setPinInput(p=>p.slice(0,-1));return;}
+      const next=pinInput+digit;
+      setPinInput(next);
+      if(next.length>=1&&selEmp){
+        const match=employees.find(e=>e.id===selEmp.id&&e.pin===next);
+        if(match){setUser(match);setView("app");setPage("menu");setSub(null);setPinInput("");}
+        else if(next.length===6){flash("PIN incorrecto",false);setPinInput("");}
+      }
+    };
+    return(<div style={{...ss.page,minHeight:"100vh",display:"flex",flexDirection:"column"}}>{CSS}{Toast}
+      {!selEmp?(<div style={{flex:1,display:"flex",flexDirection:"column",animation:"fadeUp .35s"}}>
+        <div style={{background:`linear-gradient(160deg,#1e40af,#2d5be3 60%,#3b82f6)`,padding:"36px 20px 28px",borderRadius:"0 0 32px 32px",textAlign:"center",flexShrink:0}}>
+          <div style={{display:"flex",justifyContent:"center",marginBottom:10}}><AresoLogo size={48} color="rgba(255,255,255,.2)"/></div>
+          <div style={{fontFamily:font,fontSize:26,fontWeight:700,color:"#fff",letterSpacing:1}}>ARESO</div>
+          <div style={{fontFamily:font,fontSize:11,color:"#ffffff88",marginTop:4,letterSpacing:2}}>¿QUIÉN ERES?</div>
+        </div>
+        <div style={{flex:1,padding:"20px 16px 100px",overflowY:"auto"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+            {activeEmps.map(emp=>{const col=getAvatarColor(emp.id);return(<div key={emp.id} className="profile-card" onClick={()=>{setSelEmp(emp);setPinInput("");}} style={{background:C.card,borderRadius:18,padding:"18px 8px 14px",border:`1px solid ${C.border}`,display:"flex",flexDirection:"column",alignItems:"center",gap:8,cursor:"pointer",boxShadow:"0 2px 8px #0001",transition:"transform .1s"}}>
+              <div style={{width:52,height:52,borderRadius:"50%",background:col+"22",border:`2.5px solid ${col}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:20,fontWeight:700,color:col}}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
+              <div style={{fontFamily:font,fontSize:11,fontWeight:600,color:C.text,textAlign:"center",lineHeight:1.3,wordBreak:"break-word"}}>{emp.name.split(" ")[0]}</div>
+              {emp.position&&<div style={{fontFamily:font,fontSize:8,color:C.muted,textAlign:"center"}}>{emp.position}</div>}
+            </div>);})}
+          </div>
+        </div>
+        <div style={{position:"fixed",bottom:0,left:0,right:0,background:C.card,borderTop:`1px solid ${C.border}`,padding:"10px 16px 20px",display:"flex",gap:10}}>
+          <button onClick={()=>{setView("admin-login");setAdminPin("");}} style={{flex:1,...ss.btn(C.cardLight,C.muted),border:`1px solid ${C.border}`,fontSize:12}}>🔒 Admin</button>
+        </div>
+      </div>):(
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",animation:"popIn .25s"}}>
+          <div style={{background:`linear-gradient(160deg,#1e40af,#2d5be3 60%,#3b82f6)`,width:"100%",padding:"36px 20px 32px",borderRadius:"0 0 32px 32px",textAlign:"center"}}>
+            <div style={{width:68,height:68,borderRadius:"50%",background:getAvatarColor(selEmp.id)+"33",border:`3px solid ${getAvatarColor(selEmp.id)}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",fontFamily:font,fontSize:26,fontWeight:700,color:"#fff"}}>{selEmp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
+            <div style={{fontFamily:font,fontSize:20,fontWeight:700,color:"#fff"}}>{selEmp.name}</div>
+            <div style={{fontFamily:font,fontSize:10,color:"#ffffff88",marginTop:4}}>{selEmp.position||"Empleado"}</div>
+          </div>
+          <div style={{padding:"28px 32px 0",width:"100%",maxWidth:360}}>
+            <div style={{fontFamily:font,fontSize:11,color:C.muted,textAlign:"center",marginBottom:20,letterSpacing:2}}>INTRODUCE TU PIN</div>
+            {/* PIN dots */}
+            <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:28}}>
+              {[0,1,2,3].map(i=><div key={i} style={{width:14,height:14,borderRadius:"50%",background:pinInput.length>i?C.accent:C.border,transition:"background .15s"}}/>)}
+            </div>
+            {/* Numpad */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+              {["1","2","3","4","5","6","7","8","9","","0","del"].map((d,i)=>(
+                <button key={i} onClick={()=>d&&handlePinKey(d)} style={{height:60,borderRadius:14,border:`1px solid ${C.border}`,background:d===""?"transparent":C.card,color:d==="del"?C.red:C.text,fontFamily:font,fontSize:d==="del"?18:22,fontWeight:600,cursor:d?"pointer":"default",boxShadow:d?"0 2px 6px #0001":"none",transition:"all .1s"}}>{d==="del"?"⌫":d}</button>
+              ))}
+            </div>
+          </div>
+          <button onClick={()=>{setSelEmp(null);setPinInput("");}} style={{marginTop:24,background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,textDecoration:"underline"}}>← Cambiar perfil</button>
+        </div>
+      )}
+    </div>);
+  }
 
   // ═══ REGISTER ═══
   if(view==="register")return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:400,margin:"0 auto",padding:20,minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",gap:24,animation:"fadeUp .4s"}}>
@@ -214,7 +273,7 @@ export default function App(){
 
   // ═══ ADMIN LOGIN ═══
   if(view==="admin-login")return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:400,margin:"0 auto",padding:20,minHeight:"100vh",display:"flex",flexDirection:"column",justifyContent:"center",gap:24,animation:"fadeUp .4s"}}>
-    <div style={{textAlign:"center"}}><div style={{fontFamily:font,fontSize:13,color:C.accent,letterSpacing:5,marginBottom:8}}>ARESO</div><div style={{fontSize:26,fontWeight:700}}>Administrador</div><div style={{fontFamily:font,fontSize:11,color:C.muted,marginTop:8}}>Contraseña: admin</div></div>
+    <div style={{textAlign:"center"}}><div style={{display:"flex",justifyContent:"center",marginBottom:12}}><AresoLogo size={44} color={C.accent}/></div><div style={{fontFamily:font,fontSize:22,fontWeight:700,marginBottom:4}}>Administrador</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>Contraseña: admin</div></div>
     <div style={{display:"flex",flexDirection:"column",gap:12}}><input type="password" placeholder="Contraseña admin" value={adminPin} onChange={e=>setAdminPin(e.target.value)} style={ss.input} onKeyDown={e=>e.key==="Enter"&&(adminPin===ADMIN_PIN?(setView("admin"),setAdminTab("live")):flash("Contraseña incorrecta",false))}/><button onClick={()=>adminPin===ADMIN_PIN?(setView("admin"),setAdminTab("live")):flash("Contraseña incorrecta",false)} style={ss.btn(C.accent,"#000")}>Entrar</button></div>
     <button onClick={()=>setView("login")} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,textDecoration:"underline"}}>← Volver</button>
   </div></div>);
@@ -224,7 +283,7 @@ export default function App(){
     const tabs=[{id:"live",l:"📡 Directo"},{id:"calendar",l:"📅 Horarios"},{id:"monthly",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:600,margin:"0 auto",padding:"16px 16px 24px"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
       <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>setAdminTab(t.id)} style={{padding:"7px 10px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:font,fontSize:9,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#000":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
 
       {/* LIVE */}
@@ -638,10 +697,32 @@ export default function App(){
 
     {/* PROFILE */}
     {!sub&&page==="profile"&&<>
-      <div style={{background:`linear-gradient(135deg,#2d5be3,#1e40af)`,padding:"40px 20px 30px",borderRadius:"0 0 24px 24px",textAlign:"center"}}><div style={{width:72,height:72,borderRadius:"50%",background:"#ffffff33",border:"3px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontFamily:font,fontSize:28,fontWeight:700,color:"#fff"}}>{user.name[0]}</div><div style={{fontSize:22,fontWeight:700,color:"#fff"}}>{user.name.toUpperCase()}</div><div style={{fontFamily:font,fontSize:11,color:"#ffffffaa",marginTop:4}}>Empleado</div></div>
+      <div style={{background:`linear-gradient(135deg,#2d5be3,#1e40af)`,padding:"40px 20px 30px",borderRadius:"0 0 24px 24px",textAlign:"center"}}><div style={{width:72,height:72,borderRadius:"50%",background:"#ffffff33",border:"3px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontFamily:font,fontSize:28,fontWeight:700,color:"#fff"}}>{user.name[0]}</div><div style={{fontSize:22,fontWeight:700,color:"#fff"}}>{user.name.toUpperCase()}</div><div style={{fontFamily:font,fontSize:11,color:"#ffffffaa",marginTop:4}}>{user.position||"Empleado"}</div></div>
       <div style={{padding:"20px 16px 80px",display:"flex",flexDirection:"column",gap:12}}>
         <div style={ss.card}><div style={{fontWeight:600,fontSize:14,color:C.accent,marginBottom:14}}>Datos Personales</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Email</div><div style={{fontFamily:font,fontSize:12,color:C.muted}}>{user.email}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Puesto</div><div style={{fontFamily:font,fontSize:12,color:C.muted}}>{user.position||"—"}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Teléfono</div><div style={{fontFamily:font,fontSize:12,color:C.muted}}>{user.phone||"—"}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Cumpleaños</div><div style={{fontFamily:font,fontSize:12,color:C.muted}}>{user.birthday||"—"}</div></div></div></div>
         <div style={ss.card}><div style={{fontWeight:600,fontSize:14,color:C.accent,marginBottom:14}}>Resumen</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Horas hoy</div><div style={{fontFamily:font,fontSize:16,fontWeight:700,color:C.accent}}>{fmtDur(myWorked)}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Fichajes</div><div style={{fontFamily:font,fontSize:16,fontWeight:700}}>{(records[dateKey()]||[]).filter(r=>r.empId===user.id).length}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Vacaciones</div><div style={{fontFamily:font,fontSize:16,fontWeight:700,color:C.green}}>{vacations.filter(v=>v.empId===user.id&&v.status==="approved").length}</div></div><div><div style={{fontFamily:font,fontSize:10,color:C.blue,marginBottom:2}}>Documentos</div><div style={{fontFamily:font,fontSize:16,fontWeight:700,color:C.purple}}>{documents.filter(d=>d.empId===user.id).length}</div></div></div></div>
+        {/* PIN change */}
+        <div style={ss.card}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:showPinChange?14:0}}>
+            <div style={{fontWeight:600,fontSize:14,color:C.accent}}>🔑 Cambiar PIN</div>
+            <button onClick={()=>{setShowPinChange(!showPinChange);setPinForm({current:"",newPin:"",confirm:""}); }} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:font,fontSize:11,color:C.muted}}>{showPinChange?"Cancelar":"Cambiar"}</button>
+          </div>
+          {showPinChange&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <input type="password" placeholder="PIN actual" value={pinForm.current} onChange={e=>setPinForm({...pinForm,current:e.target.value})} style={ss.input}/>
+            <input type="password" placeholder="Nuevo PIN" value={pinForm.newPin} onChange={e=>setPinForm({...pinForm,newPin:e.target.value})} style={ss.input}/>
+            <input type="password" placeholder="Confirmar nuevo PIN" value={pinForm.confirm} onChange={e=>setPinForm({...pinForm,confirm:e.target.value})} style={ss.input}/>
+            <button onClick={async()=>{
+              if(pinForm.current!==user.pin)return flash("PIN actual incorrecto",false);
+              if(!pinForm.newPin)return flash("El nuevo PIN no puede estar vacío",false);
+              if(pinForm.newPin!==pinForm.confirm)return flash("Los PINs no coinciden",false);
+              await DB.updatePin(user.id,pinForm.newPin);
+              setUser({...user,pin:pinForm.newPin});
+              setEmployees(employees.map(e=>e.id===user.id?{...e,pin:pinForm.newPin}:e));
+              setShowPinChange(false);setPinForm({current:"",newPin:"",confirm:""});
+              flash("PIN actualizado ✓");
+            }} style={ss.btn(C.accent,"#fff")}>Guardar nuevo PIN</button>
+          </div>}
+        </div>
       </div>
     </>}
 
