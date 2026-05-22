@@ -139,6 +139,8 @@ export default function App(){
   const [loginForm,setLoginForm]=useState({email:"",pin:""});
   const [pinForm,setPinForm]=useState({current:"",newPin:"",confirm:""});
   const [showPinChange,setShowPinChange]=useState(false);
+  const [loginSelEmp,setLoginSelEmp]=useState(null);
+  const [loginPin,setLoginPin]=useState("");
   const [regForm,setRegForm]=useState({name:"",email:"",pin:"",position:"",phone:"",birthday:""});
   const [editSched,setEditSched]=useState(null);
   const [calWeekStart,setCalWeekStart]=useState(()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));return dateKey(n);});
@@ -198,21 +200,19 @@ export default function App(){
 
   // ═══ LOGIN — profile picker ═══
   if(view==="login"){
-    const [selEmp,setSelEmp]=useState(null);
-    const [pinInput,setPinInput]=useState("");
     const activeEmps=employees.filter(e=>e.active);
     const handlePinKey=(digit)=>{
-      if(digit==="del"){setPinInput(p=>p.slice(0,-1));return;}
-      const next=pinInput+digit;
-      setPinInput(next);
-      if(next.length>=1&&selEmp){
-        const match=employees.find(e=>e.id===selEmp.id&&e.pin===next);
-        if(match){setUser(match);setView("app");setPage("menu");setSub(null);setPinInput("");}
-        else if(next.length===6){flash("PIN incorrecto",false);setPinInput("");}
+      if(digit==="del"){setLoginPin(p=>p.slice(0,-1));return;}
+      const next=loginPin+digit;
+      setLoginPin(next);
+      if(next.length>=1&&loginSelEmp){
+        const match=employees.find(e=>e.id===loginSelEmp.id&&e.pin===next);
+        if(match){setUser(match);setView("app");setPage("menu");setSub(null);setLoginPin("");setLoginSelEmp(null);}
+        else if(next.length===6){flash("PIN incorrecto",false);setLoginPin("");}
       }
     };
     return(<div style={{...ss.page,minHeight:"100vh",display:"flex",flexDirection:"column"}}>{CSS}{Toast}
-      {!selEmp?(<div style={{flex:1,display:"flex",flexDirection:"column",animation:"fadeUp .35s"}}>
+      {!loginSelEmp?(<div style={{flex:1,display:"flex",flexDirection:"column",animation:"fadeUp .35s"}}>
         <div style={{background:`linear-gradient(160deg,#1e40af,#2d5be3 60%,#3b82f6)`,padding:"36px 20px 28px",borderRadius:"0 0 32px 32px",textAlign:"center",flexShrink:0}}>
           <div style={{display:"flex",justifyContent:"center",marginBottom:10}}><AresoLogo size={48} color="rgba(255,255,255,.2)"/></div>
           <div style={{fontFamily:font,fontSize:26,fontWeight:700,color:"#fff",letterSpacing:1}}>ARESO</div>
@@ -220,7 +220,7 @@ export default function App(){
         </div>
         <div style={{flex:1,padding:"20px 16px 100px",overflowY:"auto"}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
-            {activeEmps.map(emp=>{const col=getAvatarColor(emp.id);return(<div key={emp.id} className="profile-card" onClick={()=>{setSelEmp(emp);setPinInput("");}} style={{background:C.card,borderRadius:18,padding:"18px 8px 14px",border:`1px solid ${C.border}`,display:"flex",flexDirection:"column",alignItems:"center",gap:8,cursor:"pointer",boxShadow:"0 2px 8px #0001",transition:"transform .1s"}}>
+            {activeEmps.map(emp=>{const col=getAvatarColor(emp.id);return(<div key={emp.id} className="profile-card" onClick={()=>{setLoginSelEmp(emp);setLoginPin("");}} style={{background:C.card,borderRadius:18,padding:"18px 8px 14px",border:`1px solid ${C.border}`,display:"flex",flexDirection:"column",alignItems:"center",gap:8,cursor:"pointer",boxShadow:"0 2px 8px #0001",transition:"transform .1s"}}>
               <div style={{width:52,height:52,borderRadius:"50%",background:col+"22",border:`2.5px solid ${col}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:20,fontWeight:700,color:col}}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
               <div style={{fontFamily:font,fontSize:11,fontWeight:600,color:C.text,textAlign:"center",lineHeight:1.3,wordBreak:"break-word"}}>{emp.name.split(" ")[0]}</div>
               {emp.position&&<div style={{fontFamily:font,fontSize:8,color:C.muted,textAlign:"center"}}>{emp.position}</div>}
@@ -233,15 +233,15 @@ export default function App(){
       </div>):(
         <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",animation:"popIn .25s"}}>
           <div style={{background:`linear-gradient(160deg,#1e40af,#2d5be3 60%,#3b82f6)`,width:"100%",padding:"36px 20px 32px",borderRadius:"0 0 32px 32px",textAlign:"center"}}>
-            <div style={{width:68,height:68,borderRadius:"50%",background:getAvatarColor(selEmp.id)+"33",border:`3px solid ${getAvatarColor(selEmp.id)}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",fontFamily:font,fontSize:26,fontWeight:700,color:"#fff"}}>{selEmp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
-            <div style={{fontFamily:font,fontSize:20,fontWeight:700,color:"#fff"}}>{selEmp.name}</div>
-            <div style={{fontFamily:font,fontSize:10,color:"#ffffff88",marginTop:4}}>{selEmp.position||"Empleado"}</div>
+            <div style={{width:68,height:68,borderRadius:"50%",background:getAvatarColor(loginSelEmp.id)+"33",border:`3px solid ${getAvatarColor(loginSelEmp.id)}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",fontFamily:font,fontSize:26,fontWeight:700,color:"#fff"}}>{loginSelEmp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
+            <div style={{fontFamily:font,fontSize:20,fontWeight:700,color:"#fff"}}>{loginSelEmp.name}</div>
+            <div style={{fontFamily:font,fontSize:10,color:"#ffffff88",marginTop:4}}>{loginSelEmp.position||"Empleado"}</div>
           </div>
           <div style={{padding:"28px 32px 0",width:"100%",maxWidth:360}}>
             <div style={{fontFamily:font,fontSize:11,color:C.muted,textAlign:"center",marginBottom:20,letterSpacing:2}}>INTRODUCE TU PIN</div>
             {/* PIN dots */}
             <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:28}}>
-              {[0,1,2,3].map(i=><div key={i} style={{width:14,height:14,borderRadius:"50%",background:pinInput.length>i?C.accent:C.border,transition:"background .15s"}}/>)}
+              {[0,1,2,3].map(i=><div key={i} style={{width:14,height:14,borderRadius:"50%",background:loginPin.length>i?C.accent:C.border,transition:"background .15s"}}/>)}
             </div>
             {/* Numpad */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
@@ -250,7 +250,7 @@ export default function App(){
               ))}
             </div>
           </div>
-          <button onClick={()=>{setSelEmp(null);setPinInput("");}} style={{marginTop:24,background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,textDecoration:"underline"}}>← Cambiar perfil</button>
+          <button onClick={()=>{setLoginSelEmp(null);setLoginPin("");}} style={{marginTop:24,background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:12,textDecoration:"underline"}}>← Cambiar perfil</button>
         </div>
       )}
     </div>);
