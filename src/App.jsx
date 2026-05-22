@@ -205,10 +205,15 @@ export default function App(){
       if(digit==="del"){setLoginPin(p=>p.slice(0,-1));return;}
       const next=loginPin+digit;
       setLoginPin(next);
-      if(next.length>=1&&loginSelEmp){
-        const match=employees.find(e=>e.id===loginSelEmp.id&&e.pin===next);
-        if(match){setUser(match);setView("app");setPage("menu");setSub(null);setLoginPin("");setLoginSelEmp(null);}
-        else if(next.length===6){flash("PIN incorrecto",false);setLoginPin("");}
+      if(next.length===4){
+        if(loginSelEmp==="admin"){
+          if(next===ADMIN_PIN){setView("admin");setAdminTab("live");setLoginPin("");setLoginSelEmp(null);}
+          else{flash("PIN incorrecto",false);setLoginPin("");}
+        } else if(loginSelEmp){
+          const match=employees.find(e=>e.id===loginSelEmp.id&&e.pin===next);
+          if(match){setUser(match);setView("app");setPage("menu");setSub(null);setLoginPin("");setLoginSelEmp(null);}
+          else{flash("PIN incorrecto",false);setLoginPin("");}
+        }
       }
     };
     return(<div style={{...ss.page,minHeight:"100vh",display:"flex",flexDirection:"column"}}>{CSS}{Toast}
@@ -218,24 +223,27 @@ export default function App(){
           <div style={{fontFamily:font,fontSize:26,fontWeight:700,color:"#fff",letterSpacing:1}}>ARESO</div>
           <div style={{fontFamily:font,fontSize:11,color:"#ffffff88",marginTop:4,letterSpacing:2}}>¿QUIÉN ERES?</div>
         </div>
-        <div style={{flex:1,padding:"20px 16px 100px",overflowY:"auto"}}>
+        <div style={{flex:1,padding:"20px 16px 24px",overflowY:"auto"}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
             {activeEmps.map(emp=>{const col=getAvatarColor(emp.id);return(<div key={emp.id} className="profile-card" onClick={()=>{setLoginSelEmp(emp);setLoginPin("");}} style={{background:C.card,borderRadius:18,padding:"18px 8px 14px",border:`1px solid ${C.border}`,display:"flex",flexDirection:"column",alignItems:"center",gap:8,cursor:"pointer",boxShadow:"0 2px 8px #0001",transition:"transform .1s"}}>
               <div style={{width:52,height:52,borderRadius:"50%",background:col+"22",border:`2.5px solid ${col}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:20,fontWeight:700,color:col}}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
               <div style={{fontFamily:font,fontSize:11,fontWeight:600,color:C.text,textAlign:"center",lineHeight:1.3,wordBreak:"break-word"}}>{emp.name.split(" ")[0]}</div>
               {emp.position&&<div style={{fontFamily:font,fontSize:8,color:C.muted,textAlign:"center"}}>{emp.position}</div>}
             </div>);})}
+            <div className="profile-card" onClick={()=>{setLoginSelEmp("admin");setLoginPin("");}} style={{background:"#1e40af11",borderRadius:18,padding:"18px 8px 14px",border:`1.5px solid #1e40af44`,display:"flex",flexDirection:"column",alignItems:"center",gap:8,cursor:"pointer",boxShadow:"0 2px 8px #0001",transition:"transform .1s"}}>
+              <div style={{width:52,height:52,borderRadius:"50%",background:"#1e40af22",border:`2.5px solid #1e40af`,display:"flex",alignItems:"center",justifyContent:"center"}}><AresoLogo size={28} color="#1e40af"/></div>
+              <div style={{fontFamily:font,fontSize:11,fontWeight:600,color:"#1e40af",textAlign:"center"}}>Admin</div>
+              <div style={{fontFamily:font,fontSize:8,color:C.muted,textAlign:"center"}}>Gestión</div>
+            </div>
           </div>
-        </div>
-        <div style={{position:"fixed",bottom:0,left:0,right:0,background:C.card,borderTop:`1px solid ${C.border}`,padding:"10px 16px 20px",display:"flex",gap:10}}>
-          <button onClick={()=>{setView("admin-login");setAdminPin("");}} style={{flex:1,...ss.btn(C.cardLight,C.muted),border:`1px solid ${C.border}`,fontSize:12}}>🔒 Admin</button>
         </div>
       </div>):(
         <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",animation:"popIn .25s"}}>
           <div style={{background:`linear-gradient(160deg,#1e40af,#2d5be3 60%,#3b82f6)`,width:"100%",padding:"36px 20px 32px",borderRadius:"0 0 32px 32px",textAlign:"center"}}>
-            <div style={{width:68,height:68,borderRadius:"50%",background:getAvatarColor(loginSelEmp.id)+"33",border:`3px solid ${getAvatarColor(loginSelEmp.id)}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",fontFamily:font,fontSize:26,fontWeight:700,color:"#fff"}}>{loginSelEmp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
-            <div style={{fontFamily:font,fontSize:20,fontWeight:700,color:"#fff"}}>{loginSelEmp.name}</div>
-            <div style={{fontFamily:font,fontSize:10,color:"#ffffff88",marginTop:4}}>{loginSelEmp.position||"Empleado"}</div>
+            {loginSelEmp==="admin"
+              ?<><div style={{width:68,height:68,borderRadius:"50%",background:"rgba(255,255,255,.15)",border:"3px solid rgba(255,255,255,.4)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px"}}><AresoLogo size={36} color="white"/></div><div style={{fontFamily:font,fontSize:20,fontWeight:700,color:"#fff"}}>Administrador</div><div style={{fontFamily:font,fontSize:10,color:"#ffffff88",marginTop:4}}>Panel de gestión</div></>
+              :<><div style={{width:68,height:68,borderRadius:"50%",background:getAvatarColor(loginSelEmp.id)+"33",border:`3px solid ${getAvatarColor(loginSelEmp.id)}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",fontFamily:font,fontSize:26,fontWeight:700,color:"#fff"}}>{loginSelEmp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div><div style={{fontFamily:font,fontSize:20,fontWeight:700,color:"#fff"}}>{loginSelEmp.name}</div><div style={{fontFamily:font,fontSize:10,color:"#ffffff88",marginTop:4}}>{loginSelEmp.position||"Empleado"}</div></>
+            }
           </div>
           <div style={{padding:"28px 32px 0",width:"100%",maxWidth:360}}>
             <div style={{fontFamily:font,fontSize:11,color:C.muted,textAlign:"center",marginBottom:20,letterSpacing:2}}>INTRODUCE TU PIN</div>
