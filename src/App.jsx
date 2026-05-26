@@ -462,46 +462,6 @@ export default function App(){
             <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>→</button>
           </div>
 
-          {/* Add/edit form popup */}
-          {addShift&&<div style={{...ss.card,border:`2px solid ${C.accent}`,animation:"fadeUp .2s"}}>
-            {(()=>{const emp=employees.find(e=>e.id===addShift.empId);const col=getAvatarColor(addShift.empId);return(<>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                <div style={ss.avatar(col,28)}>{emp?.name[0]}</div>
-                <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13}}>{emp?.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>{addShift.dayKey}</div></div>
-                <button onClick={()=>setAddShift(null)} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontSize:16,padding:"4px"}}>✕</button>
-              </div>
-              <div style={{display:"flex",gap:10,marginBottom:12}}>
-                <div style={{flex:1}}><div style={{fontFamily:font,fontSize:10,color:C.muted,marginBottom:4}}>Entrada</div><input type="time" value={shiftForm.start} onChange={e=>setShiftForm({...shiftForm,start:e.target.value})} style={ss.input}/></div>
-                <div style={{flex:1}}><div style={{fontFamily:font,fontSize:10,color:C.muted,marginBottom:4}}>Salida</div><input type="time" value={shiftForm.end} onChange={e=>setShiftForm({...shiftForm,end:e.target.value})} style={ss.input}/></div>
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={async()=>{await DB.setSchedule(addShift.empId,addShift.dayKey,shiftForm.start,shiftForm.end);setSchedules({...schedules,[addShift.empId+"_"+addShift.dayKey]:{empId:addShift.empId,start:shiftForm.start,end:shiftForm.end}});setAddShift(null);flash("Turno guardado ✓");}} style={{...ss.btn(C.accent,"#fff"),flex:2}}>✓ Guardar</button>
-                <button onClick={async()=>{
-                  const newScheds={...schedules};
-                  // Copy to whole week (Mon-Sun of the clicked day)
-                  const clickedDate=new Date(addShift.dayKey);
-                  const dow=clickedDate.getDay()||7;
-                  const mondayDate=new Date(clickedDate);
-                  mondayDate.setDate(clickedDate.getDate()-(dow-1));
-                  for(let i=0;i<7;i++){const d=new Date(mondayDate);d.setDate(mondayDate.getDate()+i);const cdk=dateKey(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}
-                  setSchedules(newScheds);setAddShift(null);flash("Aplicado a toda la semana ✓");
-                }} style={{...ss.btn(C.cardLight,C.green),flex:1,border:`1px solid ${C.border}`,fontSize:11}}>Esta semana</button>
-                <button onClick={async()=>{
-                  const newScheds={...schedules};
-                  for(let d=1;d<=daysInMonth;d++){const cdk=dk(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}
-                  setSchedules(newScheds);setAddShift(null);flash("Aplicado a todo el mes ✓");
-                }} style={{...ss.btn(C.cardLight,C.blue),flex:1,border:`1px solid ${C.border}`,fontSize:11}}>Todo el mes</button>
-              </div>
-            </>);})()} 
-          </div>}
-
-          {/* Delete confirm */}
-          {confirmDelete&&<div style={{...ss.card,border:`2px solid ${C.red}`,display:"flex",alignItems:"center",gap:12}}>
-            <div style={{flex:1,fontFamily:font,fontSize:13}}>¿Borrar turno de <b>{employees.find(e=>e.id===confirmDelete.empId)?.name.split(" ")[0]}</b> el {confirmDelete.dayKey}?</div>
-            <button onClick={async()=>{const key=confirmDelete.empId+"_"+confirmDelete.dayKey;await DB.deleteSchedule(confirmDelete.empId,confirmDelete.dayKey);const ns={...schedules};delete ns[key];setSchedules(ns);setConfirmDelete(null);flash("Borrado");}} style={{...ss.btn(C.red,"#fff"),width:"auto",padding:"8px 16px"}}>Borrar</button>
-            <button onClick={()=>setConfirmDelete(null)} style={{...ss.btn(C.cardLight,C.muted),width:"auto",padding:"8px 16px",border:`1px solid ${C.border}`}}>No</button>
-          </div>}
-
           {/* Calendar grid */}
           <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 2px 8px #0001"}}>
             <div style={{minWidth:totalW}}>
@@ -517,7 +477,10 @@ export default function App(){
               {/* Employee rows */}
               {activeEmps.map((emp,ei)=>{
                 const col=getAvatarColor(emp.id);
-                return(<div key={emp.id} style={{display:"grid",gridTemplateColumns:`${nameW}px repeat(${daysInMonth},${cellW}px)`,borderBottom:`1px solid ${C.border}22`,background:ei%2===0?C.card:C.cardLight+"88"}}>
+                const isAddingThisEmp=addShift?.empId===emp.id;
+                const isConfirmingThisEmp=confirmDelete?.empId===emp.id;
+                return(<React.Fragment key={emp.id}>
+                  <div style={{display:"grid",gridTemplateColumns:`${nameW}px repeat(${daysInMonth},${cellW}px)`,borderBottom:(isAddingThisEmp||isConfirmingThisEmp)?`1px solid ${C.accent}22`:`1px solid ${C.border}22`,background:ei%2===0?C.card:C.cardLight+"88"}}>
                   {/* Name cell */}
                   <div style={{padding:"8px 10px",display:"flex",alignItems:"center",gap:8,position:"sticky",left:0,background:ei%2===0?C.card:C.cardLight,zIndex:2,borderRight:`1px solid ${C.border}`}}>
                     <div style={ss.avatar(col,28)}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
@@ -551,7 +514,31 @@ export default function App(){
                       </div>:<div style={{fontFamily:font,fontSize:16,color:C.dim,opacity:.4}}>+</div>}
                     </div>);
                   })}
-                </div>);
+                  </div>
+                  {/* Inline form — shown right below this employee */}
+                  {isAddingThisEmp&&<div style={{gridColumn:"1/-1",background:C.card,borderBottom:`2px solid ${C.accent}`,padding:"12px 16px",display:"flex",gap:12,alignItems:"flex-end",flexWrap:"wrap",animation:"fadeUp .15s"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,minWidth:120}}>
+                      <div style={ss.avatar(col,24)}>{emp.name[0]}</div>
+                      <div><div style={{fontFamily:font,fontSize:12,fontWeight:700}}>{emp.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:10,color:C.muted}}>{addShift.dayKey}</div></div>
+                    </div>
+                    <div style={{display:"flex",gap:8,flex:1,minWidth:200}}>
+                      <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.muted,marginBottom:3}}>Entrada</div><input type="time" value={shiftForm.start} onChange={e=>setShiftForm({...shiftForm,start:e.target.value})} style={{...ss.input,padding:"8px 10px"}}/></div>
+                      <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.muted,marginBottom:3}}>Salida</div><input type="time" value={shiftForm.end} onChange={e=>setShiftForm({...shiftForm,end:e.target.value})} style={{...ss.input,padding:"8px 10px"}}/></div>
+                    </div>
+                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                      <button onClick={async()=>{await DB.setSchedule(addShift.empId,addShift.dayKey,shiftForm.start,shiftForm.end);setSchedules({...schedules,[addShift.empId+"_"+addShift.dayKey]:{empId:addShift.empId,start:shiftForm.start,end:shiftForm.end}});setAddShift(null);flash("Turno guardado ✓");}} style={{...ss.btn(C.accent,"#fff"),padding:"10px 16px",width:"auto"}}>✓ Guardar</button>
+                      <button onClick={async()=>{const newScheds={...schedules};const cd=new Date(addShift.dayKey);const dw=cd.getDay()||7;const mon=new Date(cd);mon.setDate(cd.getDate()-(dw-1));for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const cdk=dateKey(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}setSchedules(newScheds);setAddShift(null);flash("Semana aplicada ✓");}} style={{...ss.btn(C.cardLight,C.green),padding:"10px 14px",width:"auto",border:`1px solid ${C.border}`,fontSize:12}}>📅 Semana</button>
+                      <button onClick={async()=>{const newScheds={...schedules};for(let d=1;d<=daysInMonth;d++){const cdk=dk(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}setSchedules(newScheds);setAddShift(null);flash("Mes aplicado ✓");}} style={{...ss.btn(C.cardLight,C.blue),padding:"10px 14px",width:"auto",border:`1px solid ${C.border}`,fontSize:12}}>📆 Mes</button>
+                      <button onClick={()=>setAddShift(null)} style={{...ss.btn(C.cardLight,C.red),padding:"10px 14px",width:"auto",border:`1px solid ${C.red}22`,fontSize:12}}>✕</button>
+                    </div>
+                  </div>}
+                  {/* Inline delete confirm */}
+                  {isConfirmingThisEmp&&<div style={{gridColumn:"1/-1",background:"#fff5f5",borderBottom:`2px solid ${C.red}`,padding:"12px 16px",display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",animation:"fadeUp .15s"}}>
+                    <div style={{flex:1,fontFamily:font,fontSize:13}}>¿Borrar turno de <b>{emp.name.split(" ")[0]}</b> el <b>{confirmDelete.dayKey}</b>?</div>
+                    <button onClick={async()=>{const key=confirmDelete.empId+"_"+confirmDelete.dayKey;await DB.deleteSchedule(confirmDelete.empId,confirmDelete.dayKey);const ns={...schedules};delete ns[key];setSchedules(ns);setConfirmDelete(null);flash("Borrado");}} style={{...ss.btn(C.red,"#fff"),width:"auto",padding:"10px 20px"}}>Borrar</button>
+                    <button onClick={()=>setConfirmDelete(null)} style={{...ss.btn(C.cardLight,C.muted),width:"auto",padding:"10px 20px",border:`1px solid ${C.border}`}}>Cancelar</button>
+                  </div>}
+                </React.Fragment>);
               })}
             </div>
           </div>
