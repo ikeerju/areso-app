@@ -523,7 +523,13 @@ export default function App(){
                     <div style={ss.avatar(col,28)}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
                     <div style={{minWidth:0}}>
                       <div style={{fontFamily:font,fontSize:11,fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
-                      <button onClick={()=>copyEmpLastMonth(emp)} style={{background:"none",border:"none",color:C.accent,cursor:"pointer",fontFamily:font,fontSize:8,padding:0,textAlign:"left"}}>📋 copiar mes ant.</button>
+                      <button onClick={()=>copyEmpLastMonth(emp)} style={{background:"none",border:"none",color:C.accent,cursor:"pointer",fontFamily:font,fontSize:8,padding:0,textAlign:"left"}}>📋 mes ant.</button>
+                      <button onClick={async()=>{
+                        if(!window.confirm(`¿Borrar TODOS los turnos de ${emp.name.split(" ")[0]} en ${MONTH_NAMES[month]}?`))return;
+                        const newScheds={...schedules};let count=0;
+                        for(let d=1;d<=daysInMonth;d++){const cdk=dk(d);if(newScheds[emp.id+"_"+cdk]){await DB.deleteSchedule(emp.id,cdk);delete newScheds[emp.id+"_"+cdk];count++;}}
+                        setSchedules(newScheds);flash(`${emp.name.split(" ")[0]}: ${count} turnos borrados`);
+                      }} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontFamily:font,fontSize:8,padding:0,textAlign:"left"}}>🗑 borrar mes</button>
                     </div>
                   </div>
                   {/* Day cells */}
