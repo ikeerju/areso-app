@@ -11,6 +11,7 @@ const DB = {
   async addEmployee(emp) { const {data}=await sb.from('areso_employees').insert({name:emp.name,email:emp.email,password:emp.pin,position:emp.position,phone:emp.phone,birthday:emp.birthday||null,role:emp.role||'employee',active:true}).select().single(); return data?{id:data.id,name:data.name,email:data.email,pin:data.password,position:data.position,phone:data.phone,birthday:data.birthday,role:data.role,active:data.active,created:data.created_at}:null; },
   async updateEmployee(id,fields) { const dbFields={}; if('active' in fields)dbFields.active=fields.active; if('role' in fields)dbFields.role=fields.role; if('sick_leave' in fields)dbFields.sick_leave=fields.sick_leave; await sb.from('areso_employees').update(dbFields).eq('id',id); },
   async updatePin(id,newPin) { await sb.from('areso_employees').update({password:newPin}).eq('id',id); },
+  async updateEmployeeProfile(id,f) { await sb.from('areso_employees').update({name:f.name,position:f.position,phone:f.phone,birthday:f.birthday||null,email:f.email}).eq('id',id); },
   async getClockIns(dateFrom,dateTo) { const {data}=await sb.from('areso_clockins').select('*').gte('time',dateFrom).lte('time',dateTo+'T23:59:59').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:r.photo_url})); },
   async getAllClockIns() { const {data}=await sb.from('areso_clockins').select('*').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:r.photo_url})); },
   async addClockIn(rec) { await sb.from('areso_clockins').insert({employee_id:rec.empId,type:rec.type,time:new Date(rec.time).toISOString(),photo_url:rec.photo||null}); },
@@ -140,6 +141,7 @@ export default function App(){
   const [pinForm,setPinForm]=useState({current:"",newPin:"",confirm:""});
   const [showPinChange,setShowPinChange]=useState(false);
   const [loginSelEmp,setLoginSelEmp]=useState(null);
+  const [editEmp,setEditEmp]=useState(null);
   const [loginPin,setLoginPin]=useState("");
   const [regForm,setRegForm]=useState({name:"",email:"",pin:"",position:"",phone:"",birthday:""});
   const [editSched,setEditSched]=useState(null);
@@ -190,7 +192,6 @@ export default function App(){
   const confirmFichaje=async()=>{if(!photo)return flash("Foto primero",false);const dk=dateKey();const type=myStatus==="out"?"in":"out";const rec={empId:user.id,type,time:Date.now(),photo};await DB.addClockIn(rec);setRecords({...records,[dk]:[...(records[dk]||[]),rec]});flash(type==="in"?"✓ Entrada registrada":"✓ Salida registrada");setPhoto(null);loadData();};
 
   // Unread counts
-  const unreadMsgs=user?messages.filter(m=>m.to===user.id&&!m.read).length:0;
   const unreadAnns=user?announcements.filter(a=>!a.readBy?.includes(user.id)).length:0;
 
   const Toast=toast&&<div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:999,padding:"10px 24px",borderRadius:12,fontWeight:600,fontSize:13,fontFamily:font,pointerEvents:"none",background:toast.ok?"#f0fdf4":"#fef2f2",color:toast.ok?C.green:C.red,border:`1px solid ${toast.ok?"#16a34a33":"#dc262633"}`,boxShadow:"0 4px 12px #0002"}}>{toast.msg}</div>;
@@ -422,16 +423,34 @@ export default function App(){
         </div>
         {/* Employee list */}
         <div style={ss.label}>Equipo</div>
-        {employees.map(emp=><div key={emp.id} style={{...ss.statusCard,opacity:emp.active?1:0.5}}>
-          <div style={ss.avatar(getAvatarColor(emp.id),36)}>{emp.name[0]}</div>
-          <div style={{flex:1}}>
-            <div style={{fontWeight:600,fontSize:14}}>{emp.name}{emp.sickLeave&&<span style={{fontFamily:font,fontSize:9,color:C.red,marginLeft:6}}>🏥 BAJA</span>}</div>
-            <div style={{fontFamily:font,fontSize:10,color:C.dim}}>{emp.position} · {emp.email}</div>
+        {employees.map(emp=><div key={emp.id} style={{...ss.card,opacity:emp.active?1:0.5,display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{...ss.avatar(getAvatarColor(emp.id),36),flexShrink:0}}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:600,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name}{emp.sickLeave&&<span style={{fontFamily:font,fontSize:9,color:C.red,marginLeft:6}}>🏥 BAJA</span>}</div>
+              <div style={{fontFamily:font,fontSize:10,color:C.dim,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.position||"—"} · {emp.email||"—"}</div>
+            </div>
+            <div style={{display:"flex",gap:4,flexShrink:0}}>
+              <button onClick={()=>setEditEmp(editEmp?.id===emp.id?null:{id:emp.id,name:emp.name,email:emp.email||"",position:emp.position||"",phone:emp.phone||"",birthday:emp.birthday||""})} style={{fontFamily:font,fontSize:8,padding:"4px 8px",borderRadius:6,border:`1px solid ${C.border}`,cursor:"pointer",fontWeight:700,background:editEmp?.id===emp.id?C.accent+"22":C.cardLight,color:editEmp?.id===emp.id?C.accent:C.muted}}>✎</button>
+              <button onClick={async()=>{await DB.updateEmployee(emp.id,{sick_leave:!emp.sickLeave});setEmployees(employees.map(e=>e.id===emp.id?{...e,sickLeave:!e.sickLeave}:e));flash(emp.sickLeave?"Baja quitada":"Marcado de baja");}} style={{fontFamily:font,fontSize:8,padding:"4px 6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,background:emp.sickLeave?"#fef2f2":"#fff7ed",color:emp.sickLeave?C.red:C.orange}}>🏥</button>
+              <button onClick={async()=>{await DB.updateEmployee(emp.id,{active:!emp.active});setEmployees(employees.map(e=>e.id===emp.id?{...e,active:!e.active}:e));}} style={{fontFamily:font,fontSize:8,padding:"4px 6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,background:emp.active?"#f0fdf4":"#fef2f2",color:emp.active?C.green:C.red}}>{emp.active?"ON":"OFF"}</button>
+            </div>
           </div>
-          <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-            <button onClick={async()=>{await DB.updateEmployee(emp.id,{sick_leave:!emp.sickLeave});setEmployees(employees.map(e=>e.id===emp.id?{...e,sickLeave:!e.sickLeave}:e));flash(emp.sickLeave?"Baja quitada":"Marcado de baja");}} style={{fontFamily:font,fontSize:8,padding:"4px 6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,background:emp.sickLeave?"#fef2f2":"#fff7ed",color:emp.sickLeave?C.red:C.orange}}>{emp.sickLeave?"🏥 Baja":"🏥"}</button>
-            <button onClick={async()=>{await DB.updateEmployee(emp.id,{active:!emp.active});setEmployees(employees.map(e=>e.id===emp.id?{...e,active:!e.active}:e));}} style={{fontFamily:font,fontSize:8,padding:"4px 6px",borderRadius:6,border:"none",cursor:"pointer",fontWeight:700,background:emp.active?"#f0fdf4":"#fef2f2",color:emp.active?C.green:C.red}}>{emp.active?"ON":"OFF"}</button>
-          </div>
+          {editEmp?.id===emp.id&&<div style={{display:"flex",flexDirection:"column",gap:8,borderTop:`1px solid ${C.border}`,paddingTop:10}}>
+            <div style={{display:"flex",gap:8}}>
+              <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:3}}>Nombre</div><input value={editEmp.name} onChange={e=>setEditEmp({...editEmp,name:e.target.value})} style={ss.input}/></div>
+              <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:3}}>Puesto</div><input value={editEmp.position} onChange={e=>setEditEmp({...editEmp,position:e.target.value})} style={ss.input}/></div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:3}}>Email</div><input value={editEmp.email} onChange={e=>setEditEmp({...editEmp,email:e.target.value})} style={ss.input}/></div>
+              <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:3}}>Teléfono</div><input value={editEmp.phone} onChange={e=>setEditEmp({...editEmp,phone:e.target.value})} style={ss.input}/></div>
+            </div>
+            <div><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:3}}>Cumpleaños</div><input type="date" value={editEmp.birthday} onChange={e=>setEditEmp({...editEmp,birthday:e.target.value})} style={ss.input}/></div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={async()=>{if(!editEmp.name)return flash("El nombre es obligatorio",false);await DB.updateEmployeeProfile(emp.id,editEmp);setEmployees(employees.map(e=>e.id===emp.id?{...e,...editEmp}:e));setEditEmp(null);flash("Perfil actualizado ✓");}} style={{...ss.btn(C.accent,"#fff"),flex:1}}>✓ Guardar</button>
+              <button onClick={()=>setEditEmp(null)} style={{...ss.btn(C.cardLight,C.muted),flex:1,border:`1px solid ${C.border}`}}>Cancelar</button>
+            </div>
+          </div>}
         </div>)}
       </div>}
 
