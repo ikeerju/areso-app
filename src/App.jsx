@@ -31,7 +31,7 @@ const DB = {
 };
 const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 const MONTHS=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-const ADMIN_PIN="0000";
+const ADMIN_PIN="admin";
 const fmtTime=d=>new Date(d).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"});
 const fmtDate=d=>new Date(d).toLocaleDateString("es-ES",{day:"numeric",month:"short"});
 const fmtDateLong=d=>new Date(d).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"short"});
@@ -190,7 +190,7 @@ export default function App(){
   const confirmFichaje=async()=>{if(!photo)return flash("Foto primero",false);const dk=dateKey();const type=myStatus==="out"?"in":"out";const rec={empId:user.id,type,time:Date.now(),photo};await DB.addClockIn(rec);setRecords({...records,[dk]:[...(records[dk]||[]),rec]});flash(type==="in"?"✓ Entrada registrada":"✓ Salida registrada");setPhoto(null);loadData();};
 
   // Unread counts
-  
+  const unreadMsgs=user?messages.filter(m=>m.to===user.id&&!m.read).length:0;
   const unreadAnns=user?announcements.filter(a=>!a.readBy?.includes(user.id)).length:0;
 
   const Toast=toast&&<div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:999,padding:"10px 24px",borderRadius:12,fontWeight:600,fontSize:13,fontFamily:font,pointerEvents:"none",background:toast.ok?"#f0fdf4":"#fef2f2",color:toast.ok?C.green:C.red,border:`1px solid ${toast.ok?"#16a34a33":"#dc262633"}`,boxShadow:"0 4px 12px #0002"}}>{toast.msg}</div>;
@@ -455,75 +455,86 @@ export default function App(){
         const [calMonth,setCalMonth]=[calMonthView,setCalMonthView];
         const year=Math.floor(calMonth/100);const month=calMonth%100;
         const firstDay=new Date(year,month,1);const lastDay=new Date(year,month+1,0);
-        const startDow=(firstDay.getDay()+6)%7;
         const daysInMonth=lastDay.getDate();
         const activeEmps=employees.filter(e=>e.active);
         const prevMonth=()=>{const m=month===0?11:month-1;const y=month===0?year-1:year;setCalMonthView(y*100+m);};
         const nextMonth=()=>{const m=month===11?0:month+1;const y=month===11?year+1:year;setCalMonthView(y*100+m);};
         const MONTH_NAMES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+        const days=Array.from({length:daysInMonth},(_,i)=>i+1);
+        const dk=(d)=>`${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+        const isToday=(d)=>dk(d)===dateKey();
+        const dow=(d)=>new Date(year,month,d).getDay();// 0=sun
+        const isWeekend=(d)=>{const w=dow(d);return w===0||w===6;};
 
-        // Build calendar cells
-        const cells=[];
-        for(let i=0;i<startDow;i++)cells.push(null);
-        for(let d=1;d<=daysInMonth;d++)cells.push(d);
-
-        // Get shifts and vacations for a day
-        const getDayData=(day)=>{
-          const dk=`${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-          const shifts=[];const vacs=[];
-          activeEmps.forEach(emp=>{
-            const s=schedules[emp.id+"_"+dk];
-            if(s)shifts.push({emp,shift:s,color:getAvatarColor(emp.id)});
-            vacations.filter(v=>v.empId===emp.id&&(v.status==="approved"||v.status==="pending")&&v.start<=dk&&v.end>=dk).forEach(v=>{
-              vacs.push({emp,vac:v,color:getAvatarColor(emp.id)});
-            });
-          });
-          return{shifts,vacs,dk};
+        const copyLastMonth=async()=>{
+          const pm=month===0?11:month-1;const py=month===0?year-1:year;
+          const pdim=new Date(py,pm+1,0).getDate();
+          const newScheds={...schedules};let count=0;
+          for(const emp of activeEmps){
+            for(let d=1;d<=pdim&&d<=daysInMonth;d++){
+              const pdk=`${py}-${String(pm+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+              const s=schedules[emp.id+"_"+pdk];
+              if(s){const cdk=dk(d);await DB.setSchedule(emp.id,cdk,s.start,s.end);newScheds[emp.id+"_"+cdk]={empId:emp.id,start:s.start,end:s.end};count++;}
+            }
+          }
+          setSchedules(newScheds);flash(`Copiados ${count} turnos del mes anterior ✓`);
         };
 
-        return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
+        return(<div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {/* Header */}
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>←</button>
-            <div style={{flex:1,textAlign:"center",fontSize:18,fontWeight:700}}>{MONTH_NAMES[month]} {year}</div>
-            <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>→</button>
+            <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>←</button>
+            <div style={{flex:1,textAlign:"center",fontSize:16,fontWeight:700}}>{MONTH_NAMES[month]} {year}</div>
+            <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>→</button>
           </div>
+          <button onClick={copyLastMonth} style={{...ss.btn(C.cardLight,C.blue),border:`1px solid ${C.border}`,fontSize:11,padding:"8px"}}>📋 Copiar horario del mes anterior</button>
 
-          {/* Day headers */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
-            {["L","M","X","J","V","S","D"].map(d=><div key={d} style={{textAlign:"center",fontFamily:font,fontSize:10,color:C.muted,padding:4}}>{d}</div>)}
-          </div>
-
-          {/* Calendar grid */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}}>
-            {cells.map((day,i)=>{
-              if(!day)return <div key={i}/>;
-              const{shifts,vacs,dk}=getDayData(day);
-              const isToday=dk===dateKey();
-              return(<div key={i} style={{background:isToday?C.accent+"15":C.card,border:`1px solid ${isToday?C.accent+"44":C.border}`,borderRadius:10,padding:"4px 3px",minHeight:64,display:"flex",flexDirection:"column",gap:2}}>
-                <div style={{fontFamily:font,fontSize:11,fontWeight:isToday?700:400,color:isToday?C.accent:C.text,textAlign:"center",marginBottom:2}}>{day}</div>
-                {shifts.map((s,j)=><div key={"s"+j} style={{background:s.color+"28",borderLeft:`3px solid ${s.color}`,borderRadius:"0 4px 4px 0",padding:"1px 3px",marginBottom:1}}>
-                  <div style={{fontFamily:font,fontSize:7,color:s.color,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{s.emp.name.split(" ")[0]}</div>
-                  <div style={{fontFamily:font,fontSize:6,color:s.color+"aa"}}>{s.shift.start}-{s.shift.end}</div>
+          {/* Scrollable grid */}
+          <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",borderRadius:12,border:`1px solid ${C.border}`}}>
+            <div style={{minWidth:Math.max(360, daysInMonth*28+80)}}>
+              {/* Day number header */}
+              <div style={{display:"grid",gridTemplateColumns:`64px repeat(${daysInMonth},1fr)`,borderBottom:`1px solid ${C.border}`,background:C.cardLight,position:"sticky",top:0,zIndex:2}}>
+                <div style={{padding:"6px 4px",fontFamily:font,fontSize:9,color:C.muted}}>Empleado</div>
+                {days.map(d=><div key={d} style={{padding:"4px 2px",textAlign:"center",background:isToday(d)?C.accent+"22":isWeekend(d)?C.border+"44":"transparent",borderLeft:`1px solid ${C.border}22`}}>
+                  <div style={{fontFamily:font,fontSize:8,color:C.muted}}>{"DLMXJVS"[dow(d)]}</div>
+                  <div style={{fontFamily:font,fontSize:10,fontWeight:isToday(d)?700:400,color:isToday(d)?C.accent:isWeekend(d)?C.muted:C.text}}>{d}</div>
                 </div>)}
-                {vacs.map((v,j)=><div key={"v"+j} style={{background:v.vac.status==="approved"?C.green+"22":C.accent+"22",borderLeft:`3px solid ${v.vac.status==="approved"?C.green:C.accent}`,borderRadius:"0 4px 4px 0",padding:"1px 3px"}}>
-                  <div style={{fontFamily:font,fontSize:7,color:v.vac.status==="approved"?C.green:C.accent,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>🏖 {v.emp.name.split(" ")[0]}</div>
-                </div>)}
-              </div>);
-            })}
+              </div>
+              {/* One row per employee */}
+              {activeEmps.map((emp,ei)=>{
+                const col=getAvatarColor(emp.id);
+                return(<div key={emp.id} style={{display:"grid",gridTemplateColumns:`64px repeat(${daysInMonth},1fr)`,borderBottom:ei<activeEmps.length-1?`1px solid ${C.border}22`:"none",background:ei%2===0?"transparent":C.cardLight+"66"}}>
+                  {/* Name cell */}
+                  <div style={{padding:"4px 4px",display:"flex",alignItems:"center",gap:4,position:"sticky",left:0,background:ei%2===0?C.card:C.cardLight,zIndex:1,borderRight:`1px solid ${C.border}`}}>
+                    <div style={{width:18,height:18,borderRadius:"50%",background:col+"22",border:`1.5px solid ${col}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:font,fontSize:8,fontWeight:700,color:col}}>{emp.name[0]}</div>
+                    <span style={{fontFamily:font,fontSize:8,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
+                  </div>
+                  {/* Day cells */}
+                  {days.map(d=>{
+                    const s=schedules[emp.id+"_"+dk(d)];
+                    const vac=vacations.find(v=>v.empId===emp.id&&(v.status==="approved"||v.status==="pending")&&v.start<=dk(d)&&v.end>=dk(d));
+                    const bg=isToday(d)?C.accent+"15":isWeekend(d)?C.border+"22":"transparent";
+                    return(<div key={d} style={{padding:2,borderLeft:`1px solid ${C.border}11`,background:bg,minHeight:32,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {vac?<div style={{width:"90%",background:vac.status==="approved"?C.green+"33":C.accent+"33",borderRadius:4,padding:"1px 2px",textAlign:"center"}}><div style={{fontFamily:font,fontSize:6,color:vac.status==="approved"?C.green:C.accent}}>🏖</div></div>
+                      :s?<div style={{width:"90%",background:col+"22",borderRadius:4,padding:"2px 2px",borderLeft:`2px solid ${col}`,textAlign:"center"}}>
+                        <div style={{fontFamily:font,fontSize:6,color:col,fontWeight:700,whiteSpace:"nowrap"}}>{s.start}</div>
+                        <div style={{fontFamily:font,fontSize:5,color:col+"aa"}}>{s.end}</div>
+                      </div>:null}
+                    </div>);
+                  })}
+                </div>);
+              })}
+            </div>
           </div>
 
           {/* Legend */}
-          <div style={{...ss.card,padding:12}}>
-            <div style={{fontFamily:font,fontSize:10,color:C.muted,marginBottom:8}}>Leyenda</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-              {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:4}}>
-                <div style={{width:12,height:12,borderRadius:3,background:getAvatarColor(emp.id)}}/>
-                <span style={{fontFamily:font,fontSize:10,color:C.text}}>{emp.name.split(" ")[0]}</span>
+          <div style={{...ss.card,padding:10}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+              {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:3}}>
+                <div style={{width:10,height:10,borderRadius:2,background:getAvatarColor(emp.id)}}/>
+                <span style={{fontFamily:font,fontSize:9,color:C.text}}>{emp.name.split(" ")[0]}</span>
               </div>)}
-            </div>
-            <div style={{display:"flex",gap:12,marginTop:8}}>
-              <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:12,height:12,borderRadius:3,background:C.green+"44",border:`2px solid ${C.green}`}}/><span style={{fontFamily:font,fontSize:9,color:C.muted}}>Vacaciones aprobadas</span></div>
-              <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:12,height:12,borderRadius:3,background:C.accent+"44",border:`2px solid ${C.accent}`}}/><span style={{fontFamily:font,fontSize:9,color:C.muted}}>Vacaciones pendientes</span></div>
+              <div style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:10,height:10,borderRadius:2,background:C.green+"44",border:`1.5px solid ${C.green}`}}/><span style={{fontFamily:font,fontSize:9,color:C.muted}}>Vacaciones</span></div>
             </div>
           </div>
         </div>);
