@@ -194,6 +194,29 @@ export default function App(){
   // Unread counts
   const unreadAnns=user?announcements.filter(a=>!a.readBy?.includes(user.id)).length:0;
 
+  // Keyboard PIN input
+  useEffect(()=>{
+    if(view!=="login"||!loginSelEmp)return;
+    const onKey=(e)=>{
+      if(e.key>="0"&&e.key<="9"){
+        const next=loginPin+e.key;
+        setLoginPin(next);
+        if(next.length===4){
+          if(loginSelEmp==="admin"){
+            if(next===ADMIN_PIN){setView("admin");setAdminTab("live");setLoginPin("");setLoginSelEmp(null);}
+            else{setToast({msg:"PIN incorrecto",ok:false});setTimeout(()=>setToast(null),2000);setLoginPin("");}
+          } else {
+            const match=employees.find(em=>em.id===loginSelEmp.id&&em.pin===next);
+            if(match){setUser(match);setView("app");setPage("menu");setSub(null);setLoginPin("");setLoginSelEmp(null);}
+            else{setToast({msg:"PIN incorrecto",ok:false});setTimeout(()=>setToast(null),2000);setLoginPin("");}
+          }
+        }
+      } else if(e.key==="Backspace"){setLoginPin(p=>p.slice(0,-1));}
+    };
+    window.addEventListener("keydown",onKey);
+    return()=>window.removeEventListener("keydown",onKey);
+  },[view,loginSelEmp,loginPin,employees]);
+
   const Toast=toast&&<div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:999,padding:"10px 24px",borderRadius:12,fontWeight:600,fontSize:13,fontFamily:font,pointerEvents:"none",background:toast.ok?"#f0fdf4":"#fef2f2",color:toast.ok?C.green:C.red,border:`1px solid ${toast.ok?"#16a34a33":"#dc262633"}`,boxShadow:"0 4px 12px #0002"}}>{toast.msg}</div>;
 
   // ═══ LOGIN ═══
@@ -217,15 +240,6 @@ export default function App(){
         }
       }
     };
-    useEffect(()=>{
-      if(!loginSelEmp)return;
-      const onKey=(e)=>{
-        if(e.key>="0"&&e.key<="9")handlePinKey(e.key);
-        else if(e.key==="Backspace")handlePinKey("del");
-      };
-      window.addEventListener("keydown",onKey);
-      return()=>window.removeEventListener("keydown",onKey);
-    },[loginPin,loginSelEmp]);
     return(<div style={{...ss.page,minHeight:"100vh",display:"flex",flexDirection:"column"}}>{CSS}{Toast}
       {!loginSelEmp?(<div style={{flex:1,display:"flex",flexDirection:"column",animation:"fadeUp .35s"}}>
         <div style={{background:`linear-gradient(160deg,#1e40af,#2d5be3 60%,#3b82f6)`,padding:"36px 20px 28px",borderRadius:"0 0 32px 32px",textAlign:"center",flexShrink:0}}>
