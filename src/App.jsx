@@ -309,9 +309,9 @@ export default function App(){
   if(view==="admin"){
     const tabs=[{id:"live",l:"📡 Directo"},{id:"monthly",l:"📅 Horarios"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
 
-    return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:600,margin:"0 auto",padding:"16px 16px 24px"}}>
+    return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px 32px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
-      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>setAdminTab(t.id)} style={{padding:"7px 10px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:font,fontSize:9,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#000":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
+      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>setAdminTab(t.id)} style={{padding:"8px 14px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:font,fontSize:11,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#000":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
 
       {/* LIVE */}
       {adminTab==="live"&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -587,7 +587,7 @@ export default function App(){
   const nextSched=getNextSched(schedules,user.id);
   const bdays=getUpcomingBirthdays(employees);
 
-  return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:480,margin:"0 auto"}}>
+  return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:720,margin:"0 auto"}}>
 
     {/* FICHAR */}
     {sub==="fichar"&&<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}><button onClick={goHome} style={ss.back}>← Menú</button>
