@@ -307,7 +307,7 @@ export default function App(){
 
   // ═══ ADMIN PANEL ═══
   if(view==="admin"){
-    const tabs=[{id:"live",l:"📡 Directo"},{id:"calendar",l:"📅 Horarios"},{id:"monthly",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
+    const tabs=[{id:"live",l:"📡 Directo"},{id:"monthly",l:"📅 Horarios"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:600,margin:"0 auto",padding:"16px 16px 24px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
@@ -330,88 +330,6 @@ export default function App(){
         {/* Birthdays */}
         {getUpcomingBirthdays(employees).length>0&&<><div style={ss.secTitle}>🎂 Próximos cumpleaños</div>{getUpcomingBirthdays(employees).map(emp=><div key={emp.id} style={{...ss.statusCard,padding:"10px 14px"}}><div style={ss.avatar(getAvatarColor(emp.id),36)}>{emp.name[0]}</div><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{emp.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:10,color:C.muted}}>{emp.dateStr}</div></div><div style={{fontFamily:font,fontSize:11,color:emp.daysUntil===0?"#ec4899":C.muted,fontWeight:700}}>{emp.daysUntil===0?"¡Hoy!":emp.daysUntil===1?"Mañana":emp.daysUntil+"d"}</div></div>)}</>}
       </div>}
-
-      {/* CALENDAR - Visual Schedule */}
-      {adminTab==="calendar"&&(()=>{
-        const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),num:d.getDate(),month:MONTHS[d.getMonth()]});}
-        const shiftWeek=(dir)=>{const d=new Date(calWeekStart);d.setDate(d.getDate()+(dir*7));setCalWeekStart(dateKey(d));};
-        const activeEmps=employees.filter(e=>e.active);
-        return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
-          {/* Week navigation */}
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <button onClick={()=>shiftWeek(-1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>←</button>
-            <div style={{flex:1,textAlign:"center"}}><span style={{fontFamily:font,fontSize:13,fontWeight:700}}>{weekDays[0].num} {weekDays[0].month}</span><span style={{fontFamily:font,fontSize:13,color:C.dim}}> — </span><span style={{fontFamily:font,fontSize:13,fontWeight:700}}>{weekDays[6].num} {weekDays[6].month}</span></div>
-            <button onClick={()=>shiftWeek(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>→</button>
-            <button onClick={()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));setCalWeekStart(dateKey(n));}} style={{...ss.btn(C.card,C.muted),width:"auto",border:`1px solid ${C.border}`,padding:"8px 12px",fontSize:10}}>Hoy</button>
-          </div>
-
-          {/* Calendar grid */}
-          <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-            <div style={{display:"grid",gridTemplateColumns:`72px repeat(7, minmax(44px,1fr))`,gap:2,minWidth:420}}>
-              {/* Header row */}
-              <div style={{padding:8}}/>
-              {weekDays.map(d=><div key={d.date} style={{padding:"6px 2px",textAlign:"center",background:d.date===dateKey()?C.accent+"22":C.cardLight,borderRadius:8}}>
-                <div style={{fontFamily:font,fontSize:9,color:d.date===dateKey()?C.accent:C.muted}}>{d.label}</div>
-                <div style={{fontFamily:font,fontSize:13,fontWeight:700,color:d.date===dateKey()?C.accent:C.text}}>{d.num}</div>
-              </div>)}
-              {/* Employee rows + inline form */}
-              {activeEmps.map(emp=>{const col=getAvatarColor(emp.id);const isAdding=addShift?.empId===emp.id;const isConfirmingDelete=confirmDelete?.empId===emp.id;return(<React.Fragment key={emp.id}>
-                <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 4px"}}>
-                  <div style={ss.avatar(col,28)}>{emp.name[0]}</div>
-                  <div style={{fontFamily:font,fontSize:10,color:C.text,lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
-                </div>
-                {weekDays.map(d=>{const key=emp.id+"_"+d.date;const shift=schedules[key];const isDeleting=confirmDelete?.empId===emp.id&&confirmDelete?.dayKey===d.date;
-                  return(<div key={d.date} style={{padding:3,minHeight:44,display:"flex",flexDirection:"column",gap:2,justifyContent:"center",cursor:"pointer",borderRadius:8,background:isDeleting?C.red+"11":C.bg,border:`1px solid ${isDeleting?C.red+"44":C.border}`}} onClick={()=>{
-                    if(isDeleting)return;
-                    if(shift){setConfirmDelete({empId:emp.id,dayKey:d.date});}
-                    else{setAddShift({empId:emp.id,dayKey:d.date});setShiftForm({start:"09:00",end:"17:00"});setConfirmDelete(null);}
-                  }}>
-                    {isDeleting?<div style={{textAlign:"center"}}>
-                      <div style={{fontFamily:font,fontSize:7,color:C.red,marginBottom:2}}>¿Borrar?</div>
-                      <div style={{display:"flex",gap:2,justifyContent:"center"}}>
-                        <button onClick={async(e)=>{e.stopPropagation();await DB.deleteSchedule(emp.id,d.date);const newScheds={...schedules};delete newScheds[key];setSchedules(newScheds);setConfirmDelete(null);flash("Borrado");}} style={{background:C.red,color:"#fff",border:"none",borderRadius:4,padding:"2px 6px",fontSize:7,fontFamily:font,fontWeight:700,cursor:"pointer"}}>Sí</button>
-                        <button onClick={(e)=>{e.stopPropagation();setConfirmDelete(null);}} style={{background:C.cardLight,color:C.muted,border:"none",borderRadius:4,padding:"2px 6px",fontSize:7,fontFamily:font,cursor:"pointer"}}>No</button>
-                      </div>
-                    </div>:shift?<div style={{background:col+"33",border:`1px solid ${col}`,borderRadius:6,padding:"3px 4px",textAlign:"center"}}>
-                      <div style={{fontFamily:font,fontSize:9,fontWeight:700,color:col}}>{shift.start}</div>
-                      <div style={{fontFamily:font,fontSize:8,color:col+"aa"}}>{shift.end}</div>
-                    </div>:<div style={{fontFamily:font,fontSize:14,color:C.dim,textAlign:"center"}}>+</div>}
-                  </div>);
-                })}
-                {/* Inline form below the employee row */}
-                {isAdding&&<>
-                  <div/>
-                  <div style={{gridColumn:"span 7",background:C.card,borderRadius:12,padding:12,border:`1px solid ${C.accent}`,marginBottom:4}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                      <div style={ss.avatar(col,24)}>{emp.name[0]}</div>
-                      <span style={{fontWeight:600,fontSize:12}}>{emp.name.split(" ")[0]}</span>
-                      <span style={{fontFamily:font,fontSize:10,color:C.muted}}>{addShift.dayKey}</span>
-                      <button onClick={()=>setAddShift(null)} style={{marginLeft:"auto",background:"none",border:"none",color:C.red,cursor:"pointer",fontSize:12}}>✕</button>
-                    </div>
-                    <div style={{display:"flex",gap:8,marginBottom:8}}>
-                      <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:4}}>Entrada</div><input type="time" value={shiftForm.start} onChange={e=>setShiftForm({...shiftForm,start:e.target.value})} style={ss.input}/></div>
-                      <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:4}}>Salida</div><input type="time" value={shiftForm.end} onChange={e=>setShiftForm({...shiftForm,end:e.target.value})} style={ss.input}/></div>
-                    </div>
-                    <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                      <button onClick={async()=>{await DB.setSchedule(addShift.empId,addShift.dayKey,shiftForm.start,shiftForm.end);const key=addShift.empId+"_"+addShift.dayKey;setSchedules({...schedules,[key]:{empId:addShift.empId,start:shiftForm.start,end:shiftForm.end}});setAddShift(null);flash("Turno añadido");}} style={{...ss.btn(C.accent,"#fff"),flex:1}}>✓ Guardar</button>
-                      <button onClick={async()=>{const newScheds={...schedules};for(const d of weekDays){await DB.setSchedule(addShift.empId,d.date,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+d.date]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}setSchedules(newScheds);setAddShift(null);flash("Copiado a la semana");}} style={{...ss.btn(C.cardLight,C.accent),flex:1,border:`1px solid ${C.border}`,fontSize:11}}>📅 Toda la semana</button>
-                      <button onClick={async()=>{const newScheds={...schedules};const year=Math.floor(calMonthView/100);const month=calMonthView%100;const daysInMonth=new Date(year,month+1,0).getDate();for(let i=1;i<=daysInMonth;i++){const dk=`${year}-${String(month+1).padStart(2,"0")}-${String(i).padStart(2,"0")}`;await DB.setSchedule(addShift.empId,dk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+dk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}setSchedules(newScheds);setAddShift(null);flash("Copiado a todo el mes");}} style={{...ss.btn(C.cardLight,C.blue),flex:1,border:`1px solid ${C.border}`,fontSize:11}}>📆 Todo el mes</button>
-                    </div>
-                  </div>
-                </>}
-              </React.Fragment>);})}
-            </div>
-          </div>
-
-          {/* Legend */}
-          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-            {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:4,fontFamily:font,fontSize:10}}>
-              <div style={{width:10,height:10,borderRadius:3,background:getAvatarColor(emp.id)}}/>
-              <span style={{color:C.muted}}>{emp.name.split(" ")[0]}</span>
-            </div>)}
-          </div>
-        </div>);
-      })()}
 
       {/* RECORDS */}
       {adminTab==="records"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -492,7 +410,7 @@ export default function App(){
         </div>)}
       </div>}
 
-      {/* MONTHLY CALENDAR — fila por empleado */}
+      {/* HORARIOS — calendario mensual interactivo */}
       {adminTab==="monthly"&&(()=>{
         const year=Math.floor(calMonthView/100);const month=calMonthView%100;
         const daysInMonth=new Date(year,month+1,0).getDate();
@@ -505,65 +423,133 @@ export default function App(){
         const isToday=(d)=>dk(d)===dateKey();
         const dow=(d)=>new Date(year,month,d).getDay();
         const isWeekend=(d)=>{const w=dow(d);return w===0||w===6;};
-        const copyLastMonth=async()=>{
+        const DAY_LABELS=["D","L","M","X","J","V","S"];
+
+        const copyEmpLastMonth=async(emp)=>{
           const pm=month===0?11:month-1;const py=month===0?year-1:year;
           const pdim=new Date(py,pm+1,0).getDate();
           const newScheds={...schedules};let count=0;
-          for(const emp of activeEmps){
-            for(let d=1;d<=Math.min(pdim,daysInMonth);d++){
-              const pdk=`${py}-${String(pm+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-              const s=schedules[emp.id+"_"+pdk];
-              if(s){const cdk=dk(d);await DB.setSchedule(emp.id,cdk,s.start,s.end);newScheds[emp.id+"_"+cdk]={empId:emp.id,start:s.start,end:s.end};count++;}
-            }
+          for(let d=1;d<=Math.min(pdim,daysInMonth);d++){
+            const pdk=`${py}-${String(pm+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+            const s=schedules[emp.id+"_"+pdk];
+            if(s){const cdk=dk(d);await DB.setSchedule(emp.id,cdk,s.start,s.end);newScheds[emp.id+"_"+cdk]={empId:emp.id,start:s.start,end:s.end};count++;}
           }
-          setSchedules(newScheds);flash(`Copiados ${count} turnos ✓`);
+          setSchedules(newScheds);flash(`${emp.name.split(" ")[0]}: ${count} turnos copiados ✓`);
         };
-        return(<div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+        const handleCellClick=(emp,d)=>{
+          const key=emp.id+"_"+dk(d);
+          const existing=schedules[key];
+          if(existing){
+            setConfirmDelete({empId:emp.id,dayKey:dk(d)});
+          } else {
+            setAddShift({empId:emp.id,dayKey:dk(d)});
+            setShiftForm({start:"09:00",end:"17:00"});
+            setConfirmDelete(null);
+          }
+        };
+
+        // Responsive: on desktop use bigger cells
+        const cellW = 38;
+        const nameW = 110;
+        const totalW = nameW + daysInMonth * cellW;
+
+        return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {/* Header nav */}
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>←</button>
-            <div style={{flex:1,textAlign:"center",fontSize:16,fontWeight:700}}>{MONTH_NAMES[month]} {year}</div>
-            <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>→</button>
+            <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>←</button>
+            <div style={{flex:1,textAlign:"center",fontSize:18,fontWeight:700,fontFamily:font}}>{MONTH_NAMES[month]} {year}</div>
+            <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>→</button>
           </div>
-          <button onClick={copyLastMonth} style={{...ss.btn(C.cardLight,C.blue),border:`1px solid ${C.border}`,fontSize:11,padding:"8px"}}>📋 Copiar horario del mes anterior</button>
-          <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",borderRadius:12,border:`1px solid ${C.border}`}}>
-            <div style={{minWidth:Math.max(360,daysInMonth*26+72)}}>
-              <div style={{display:"grid",gridTemplateColumns:`60px repeat(${daysInMonth},1fr)`,borderBottom:`1px solid ${C.border}`,background:C.cardLight}}>
-                <div style={{padding:"6px 4px",fontFamily:font,fontSize:9,color:C.muted}}>Empleado</div>
-                {days.map(d=><div key={d} style={{padding:"4px 1px",textAlign:"center",background:isToday(d)?C.accent+"22":isWeekend(d)?C.border+"44":"transparent",borderLeft:`1px solid ${C.border}22`}}>
-                  <div style={{fontFamily:font,fontSize:7,color:C.muted}}>{"DLMXJVS"[dow(d)]}</div>
-                  <div style={{fontFamily:font,fontSize:9,fontWeight:isToday(d)?700:400,color:isToday(d)?C.accent:isWeekend(d)?C.muted:C.text}}>{d}</div>
+
+          {/* Add/edit form popup */}
+          {addShift&&<div style={{...ss.card,border:`2px solid ${C.accent}`,animation:"fadeUp .2s"}}>
+            {(()=>{const emp=employees.find(e=>e.id===addShift.empId);const col=getAvatarColor(addShift.empId);return(<>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                <div style={ss.avatar(col,28)}>{emp?.name[0]}</div>
+                <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13}}>{emp?.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>{addShift.dayKey}</div></div>
+                <button onClick={()=>setAddShift(null)} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontSize:16,padding:"4px"}}>✕</button>
+              </div>
+              <div style={{display:"flex",gap:10,marginBottom:12}}>
+                <div style={{flex:1}}><div style={{fontFamily:font,fontSize:10,color:C.muted,marginBottom:4}}>Entrada</div><input type="time" value={shiftForm.start} onChange={e=>setShiftForm({...shiftForm,start:e.target.value})} style={ss.input}/></div>
+                <div style={{flex:1}}><div style={{fontFamily:font,fontSize:10,color:C.muted,marginBottom:4}}>Salida</div><input type="time" value={shiftForm.end} onChange={e=>setShiftForm({...shiftForm,end:e.target.value})} style={ss.input}/></div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={async()=>{await DB.setSchedule(addShift.empId,addShift.dayKey,shiftForm.start,shiftForm.end);setSchedules({...schedules,[addShift.empId+"_"+addShift.dayKey]:{empId:addShift.empId,start:shiftForm.start,end:shiftForm.end}});setAddShift(null);flash("Turno guardado ✓");}} style={{...ss.btn(C.accent,"#fff"),flex:2}}>✓ Guardar</button>
+                <button onClick={async()=>{
+                  const newScheds={...schedules};
+                  for(let d=1;d<=daysInMonth;d++){const cdk=dk(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}
+                  setSchedules(newScheds);setAddShift(null);flash("Aplicado a todo el mes ✓");
+                }} style={{...ss.btn(C.cardLight,C.blue),flex:1,border:`1px solid ${C.border}`,fontSize:11}}>Todo el mes</button>
+              </div>
+            </>);})()} 
+          </div>}
+
+          {/* Delete confirm */}
+          {confirmDelete&&<div style={{...ss.card,border:`2px solid ${C.red}`,display:"flex",alignItems:"center",gap:12}}>
+            <div style={{flex:1,fontFamily:font,fontSize:13}}>¿Borrar turno de <b>{employees.find(e=>e.id===confirmDelete.empId)?.name.split(" ")[0]}</b> el {confirmDelete.dayKey}?</div>
+            <button onClick={async()=>{const key=confirmDelete.empId+"_"+confirmDelete.dayKey;await DB.deleteSchedule(confirmDelete.empId,confirmDelete.dayKey);const ns={...schedules};delete ns[key];setSchedules(ns);setConfirmDelete(null);flash("Borrado");}} style={{...ss.btn(C.red,"#fff"),width:"auto",padding:"8px 16px"}}>Borrar</button>
+            <button onClick={()=>setConfirmDelete(null)} style={{...ss.btn(C.cardLight,C.muted),width:"auto",padding:"8px 16px",border:`1px solid ${C.border}`}}>No</button>
+          </div>}
+
+          {/* Calendar grid */}
+          <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 2px 8px #0001"}}>
+            <div style={{minWidth:totalW}}>
+              {/* Day headers */}
+              <div style={{display:"grid",gridTemplateColumns:`${nameW}px repeat(${daysInMonth},${cellW}px)`,background:C.cardLight,borderBottom:`2px solid ${C.border}`,position:"sticky",top:0,zIndex:3}}>
+                <div style={{padding:"10px 12px",fontFamily:font,fontSize:11,fontWeight:600,color:C.muted,borderRight:`1px solid ${C.border}`}}>Empleado</div>
+                {days.map(d=><div key={d} style={{padding:"6px 2px",textAlign:"center",background:isToday(d)?C.accent+"22":isWeekend(d)?"#f5f5ff":"transparent",borderLeft:`1px solid ${C.border}22`}}>
+                  <div style={{fontFamily:font,fontSize:9,color:isToday(d)?C.accent:isWeekend(d)?C.purple:C.muted,fontWeight:600}}>{DAY_LABELS[dow(d)]}</div>
+                  <div style={{fontFamily:font,fontSize:13,fontWeight:isToday(d)?700:500,color:isToday(d)?C.accent:isWeekend(d)?C.purple:C.text}}>{d}</div>
                 </div>)}
               </div>
+
+              {/* Employee rows */}
               {activeEmps.map((emp,ei)=>{
                 const col=getAvatarColor(emp.id);
-                return(<div key={emp.id} style={{display:"grid",gridTemplateColumns:`60px repeat(${daysInMonth},1fr)`,borderBottom:ei<activeEmps.length-1?`1px solid ${C.border}22`:"none",background:ei%2===0?"transparent":C.cardLight+"66"}}>
-                  <div style={{padding:"4px",display:"flex",alignItems:"center",gap:3,position:"sticky",left:0,background:ei%2===0?C.card:C.cardLight,zIndex:1,borderRight:`1px solid ${C.border}`}}>
-                    <div style={{width:16,height:16,borderRadius:"50%",background:col+"22",border:`1.5px solid ${col}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:font,fontSize:7,fontWeight:700,color:col}}>{emp.name[0]}</div>
-                    <span style={{fontFamily:font,fontSize:7,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
+                return(<div key={emp.id} style={{display:"grid",gridTemplateColumns:`${nameW}px repeat(${daysInMonth},${cellW}px)`,borderBottom:`1px solid ${C.border}22`,background:ei%2===0?C.card:C.cardLight+"88"}}>
+                  {/* Name cell */}
+                  <div style={{padding:"8px 10px",display:"flex",alignItems:"center",gap:8,position:"sticky",left:0,background:ei%2===0?C.card:C.cardLight,zIndex:2,borderRight:`1px solid ${C.border}`}}>
+                    <div style={ss.avatar(col,28)}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontFamily:font,fontSize:11,fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
+                      <button onClick={()=>copyEmpLastMonth(emp)} style={{background:"none",border:"none",color:C.accent,cursor:"pointer",fontFamily:font,fontSize:8,padding:0,textAlign:"left"}}>📋 copiar mes ant.</button>
+                    </div>
                   </div>
+                  {/* Day cells */}
                   {days.map(d=>{
-                    const s=schedules[emp.id+"_"+dk(d)];
+                    const key=emp.id+"_"+dk(d);
+                    const s=schedules[key];
                     const vac=vacations.find(v=>v.empId===emp.id&&(v.status==="approved"||v.status==="pending")&&v.start<=dk(d)&&v.end>=dk(d));
-                    return(<div key={d} style={{padding:1,borderLeft:`1px solid ${C.border}11`,background:isToday(d)?C.accent+"15":isWeekend(d)?C.border+"22":"transparent",minHeight:28,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {vac?<div style={{width:"88%",background:vac.status==="approved"?C.green+"33":C.accent+"33",borderRadius:3,textAlign:"center",padding:"1px 0"}}><div style={{fontFamily:font,fontSize:7,color:vac.status==="approved"?C.green:C.accent}}>🏖</div></div>
-                      :s?<div style={{width:"88%",background:col+"22",borderRadius:3,borderLeft:`2px solid ${col}`,padding:"1px 2px"}}>
-                        <div style={{fontFamily:font,fontSize:6,color:col,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden"}}>{s.start}</div>
-                        <div style={{fontFamily:font,fontSize:5,color:col+"aa"}}>{s.end}</div>
-                      </div>:null}
+                    const isAdding=addShift?.empId===emp.id&&addShift?.dayKey===dk(d);
+                    const isDeleting=confirmDelete?.empId===emp.id&&confirmDelete?.dayKey===dk(d);
+                    const bgBase=isToday(d)?C.accent+"15":isWeekend(d)?"#f5f5ff":"transparent";
+                    return(<div key={d} onClick={()=>!vac&&handleCellClick(emp,d)} style={{padding:2,borderLeft:`1px solid ${C.border}11`,background:isDeleting?C.red+"22":isAdding?C.accent+"22":bgBase,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center",cursor:vac?"default":"pointer",transition:"background .1s"}}
+                      onMouseEnter={e=>{if(!vac)e.currentTarget.style.background=isAdding?C.accent+"33":C.accent+"11";}}
+                      onMouseLeave={e=>{e.currentTarget.style.background=isDeleting?C.red+"22":isAdding?C.accent+"22":bgBase;}}>
+                      {vac?<div style={{width:"92%",background:vac.status==="approved"?C.green+"44":C.accent+"33",borderRadius:4,textAlign:"center",padding:"3px 1px"}}>
+                        <div style={{fontFamily:font,fontSize:9}}>🏖</div>
+                      </div>:s?<div style={{width:"92%",background:col+"28",borderRadius:4,borderLeft:`3px solid ${col}`,padding:"2px 3px"}}>
+                        <div style={{fontFamily:font,fontSize:9,color:col,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden"}}>{s.start}</div>
+                        <div style={{fontFamily:font,fontSize:8,color:col+"bb"}}>{s.end}</div>
+                      </div>:<div style={{fontFamily:font,fontSize:16,color:C.dim,opacity:.4}}>+</div>}
                     </div>);
                   })}
                 </div>);
               })}
             </div>
           </div>
-          <div style={{...ss.card,padding:10}}><div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
-            {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:10,height:10,borderRadius:2,background:getAvatarColor(emp.id)}}/><span style={{fontFamily:font,fontSize:9,color:C.text}}>{emp.name.split(" ")[0]}</span></div>)}
-            <div style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:10,height:10,borderRadius:2,background:C.green+"44",border:`1.5px solid ${C.green}`}}/><span style={{fontFamily:font,fontSize:9,color:C.muted}}>Vacaciones</span></div>
-          </div></div>
+
+          {/* Legend */}
+          <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"center",padding:"4px 0"}}>
+            {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:2,background:getAvatarColor(emp.id)}}/><span style={{fontFamily:font,fontSize:10,color:C.text}}>{emp.name.split(" ")[0]}</span></div>)}
+            <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:2,background:C.green+"44",border:`1.5px solid ${C.green}`}}/><span style={{fontFamily:font,fontSize:10,color:C.muted}}>Vacaciones</span></div>
+            <div style={{fontFamily:font,fontSize:10,color:C.dim,marginLeft:"auto"}}>Clic en celda para añadir · Clic en turno para borrar</div>
+          </div>
         </div>);
       })()}
 
-      {/* VACATIONS */}
+            {/* VACATIONS */}
       {adminTab==="vacations"&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
         {vacations.sort((a,b)=>b.id-a.id).map(v=>{const emp=employees.find(e=>e.id===v.empId);const cc={pending:{bg:"#fefce8",c:C.accent},approved:{bg:"#f0fdf4",c:C.green},rejected:{bg:"#fef2f2",c:C.red}}[v.status];return(<div key={v.id} style={{...ss.card,display:"flex",flexDirection:"column",gap:8}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:600}}>{emp?.name?.split(" ")[0]}</span><span style={{fontFamily:font,fontSize:12}}>{fmtDate(v.start)} → {fmtDate(v.end)}</span><span style={{marginLeft:"auto",fontFamily:font,fontSize:9,fontWeight:700,padding:"3px 8px",borderRadius:6,background:cc.bg,color:cc.c}}>{v.status==="pending"?"PENDIENTE":v.status==="approved"?"APROBADA":"RECHAZADA"}</span></div>
@@ -609,56 +595,6 @@ export default function App(){
       <div style={{display:"flex",gap:10}}><div style={{...ss.card,padding:"12px 18px",textAlign:"center",flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.muted,letterSpacing:1}}>ESTADO</div><div style={{fontFamily:font,fontSize:15,fontWeight:700,color:myStatus==="in"?C.green:C.dim,marginTop:4}}>{myStatus==="in"?"Trabajando":"Fuera"}</div></div><div style={{...ss.card,padding:"12px 18px",textAlign:"center",flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.muted,letterSpacing:1}}>HOY</div><div style={{fontFamily:font,fontSize:15,fontWeight:700,color:C.accent,marginTop:4}}>{fmtDur(myWorked)}</div></div></div>
       {!photo?(<div style={{...ss.card,textAlign:"center",display:"flex",flexDirection:"column",gap:12,padding:20}}><div style={{fontFamily:font,fontSize:11,color:C.muted}}>📸 Foto al reloj para {myStatus==="out"?"entrada":"salida"}</div>{cameraOn?(<><video ref={videoRef} autoPlay playsInline muted/><button onClick={takePhoto} style={ss.btn(myStatus==="out"?C.green:C.red,"#000")}>📸 Capturar</button><button onClick={stopCamera} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Cancelar</button></>):(<><button onClick={startCamera} style={ss.btn(myStatus==="out"?C.green:C.red,"#000")}>📷 Abrir cámara</button><button onClick={()=>fileRef.current?.click()} style={{...ss.btn(C.cardLight,C.muted),border:`1px solid ${C.border}`}}>📁 Subir de galería</button><input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{display:"none"}}/></>)}</div>):(<div style={{display:"flex",flexDirection:"column",gap:12}}><img src={photo} alt="" style={{width:"100%",borderRadius:14,border:`2px solid ${C.border}`}}/><button onClick={confirmFichaje} style={ss.btn(myStatus==="out"?C.green:C.red,"#000")}>✓ Confirmar {myStatus==="out"?"entrada":"salida"}</button><button onClick={()=>setPhoto(null)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11,textAlign:"center"}}>Repetir foto</button></div>)}
     </div>}
-
-    {/* HORARIOS - Employee visual calendar */}
-    {sub==="horarios"&&(()=>{
-      const getWeekStart=()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));return dateKey(n);};
-      const [wk,setWk]=[calWeekStart2,setCalWeekStart2];
-      const weekDays=[];for(let i=0;i<7;i++){const d=new Date(wk);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),num:d.getDate(),full:DAYS[i]});}
-      const shiftWk=(dir)=>{const d=new Date(wk);d.setDate(d.getDate()+(dir*7));setCalWeekStart2(dateKey(d));};
-      const myShifts=weekDays.map(d=>({...d,shift:schedules[user.id+"_"+d.date]}));
-      const col=getAvatarColor(user.id);
-      return(<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}>
-        <button onClick={goHome} style={ss.back}>← Menú</button>
-        <div style={{fontSize:20,fontWeight:700}}>Mis horarios</div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <button onClick={()=>shiftWk(-1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>←</button>
-          <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:13,fontWeight:700}}>{weekDays[0].num} {MONTHS[new Date(weekDays[0].date).getMonth()]} — {weekDays[6].num} {MONTHS[new Date(weekDays[6].date).getMonth()]}</div>
-          <button onClick={()=>shiftWk(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>→</button>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {myShifts.map(d=>(
-            <div key={d.date} style={{...ss.statusCard,background:d.date===dateKey()?C.accent+"11":C.card,borderColor:d.date===dateKey()?C.accent+"44":C.border}}>
-              <div style={{minWidth:70}}>
-                <div style={{fontFamily:font,fontSize:12,fontWeight:700,color:d.date===dateKey()?C.accent:C.text}}>{d.full.slice(0,3)}</div>
-                <div style={{fontFamily:font,fontSize:10,color:C.muted}}>{d.num}</div>
-              </div>
-              {d.shift?<div style={{flex:1,display:"flex",alignItems:"center",gap:8}}>
-                <div style={{background:col+"22",border:`2px solid ${col}`,borderRadius:10,padding:"8px 14px",flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                  <span style={{fontFamily:font,fontSize:14,fontWeight:700,color:col}}>{d.shift.start}</span>
-                  <span style={{color:C.dim}}>→</span>
-                  <span style={{fontFamily:font,fontSize:14,fontWeight:700,color:col}}>{d.shift.end}</span>
-                </div>
-              </div>:<div style={{flex:1,fontFamily:font,fontSize:12,color:C.dim,textAlign:"center"}}>Libre</div>}
-            </div>
-          ))}
-        </div>
-        {/* Team view */}
-        <div style={ss.secTitle}>Equipo esta semana</div>
-        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-          <div style={{display:"grid",gridTemplateColumns:`64px repeat(7,minmax(36px,1fr))`,gap:2,minWidth:360}}>
-            <div/>
-            {weekDays.map(d=><div key={d.date} style={{textAlign:"center",padding:4}}><div style={{fontFamily:font,fontSize:8,color:d.date===dateKey()?C.accent:C.muted}}>{d.label}</div><div style={{fontFamily:font,fontSize:11,fontWeight:700,color:d.date===dateKey()?C.accent:C.text}}>{d.num}</div></div>)}
-            {employees.filter(e=>e.active).map(emp=>{const ec=getAvatarColor(emp.id);return(<React.Fragment key={emp.id}>
-              <div style={{display:"flex",alignItems:"center",gap:3,padding:"2px 0"}}><div style={ss.avatar(ec,20)}>{emp.name[0]}</div><span style={{fontFamily:font,fontSize:7,color:C.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span></div>
-              {weekDays.map(d=>{const s=schedules[emp.id+"_"+d.date];return(<div key={d.date} style={{padding:2,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                {s?<div style={{background:ec+"33",borderRadius:4,padding:"2px 2px",width:"100%",textAlign:"center"}}><div style={{fontFamily:font,fontSize:7,color:ec,fontWeight:700,whiteSpace:"nowrap"}}>{s.start}</div></div>:<div style={{fontFamily:font,fontSize:10,color:C.dim}}>·</div>}
-              </div>);})}
-            </React.Fragment>);})}
-          </div>
-        </div>
-      </div>);
-    })()}
 
     {/* VACACIONES */}
     {sub==="vacaciones"&&<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}><button onClick={goHome} style={ss.back}>← Menú</button><div style={{fontSize:20,fontWeight:700}}>Vacaciones</div>
@@ -717,8 +653,7 @@ export default function App(){
         {/* Modules */}
         <div style={ss.secTitle}>Jornada</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div style={ss.moduleCard} onClick={()=>setSub("fichar")}>{Ic.clock}<span style={{fontSize:14,fontWeight:600}}>Fichar</span></div>
-          <div style={ss.moduleCard} onClick={()=>setSub("horarios")}>{Ic.cal}<span style={{fontSize:14,fontWeight:600}}>Horarios</span></div>
+          <div style={{...ss.moduleCard,gridColumn:"span 2"}} onClick={()=>setSub("fichar")}>{Ic.clock}<span style={{fontSize:14,fontWeight:600}}>Fichar</span></div>
         </div>
         <div style={ss.secTitle}>Comunicación</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
