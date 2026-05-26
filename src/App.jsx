@@ -478,6 +478,16 @@ export default function App(){
                 <button onClick={async()=>{await DB.setSchedule(addShift.empId,addShift.dayKey,shiftForm.start,shiftForm.end);setSchedules({...schedules,[addShift.empId+"_"+addShift.dayKey]:{empId:addShift.empId,start:shiftForm.start,end:shiftForm.end}});setAddShift(null);flash("Turno guardado ✓");}} style={{...ss.btn(C.accent,"#fff"),flex:2}}>✓ Guardar</button>
                 <button onClick={async()=>{
                   const newScheds={...schedules};
+                  // Copy to whole week (Mon-Sun of the clicked day)
+                  const clickedDate=new Date(addShift.dayKey);
+                  const dow=clickedDate.getDay()||7;
+                  const mondayDate=new Date(clickedDate);
+                  mondayDate.setDate(clickedDate.getDate()-(dow-1));
+                  for(let i=0;i<7;i++){const d=new Date(mondayDate);d.setDate(mondayDate.getDate()+i);const cdk=dateKey(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}
+                  setSchedules(newScheds);setAddShift(null);flash("Aplicado a toda la semana ✓");
+                }} style={{...ss.btn(C.cardLight,C.green),flex:1,border:`1px solid ${C.border}`,fontSize:11}}>Esta semana</button>
+                <button onClick={async()=>{
+                  const newScheds={...schedules};
                   for(let d=1;d<=daysInMonth;d++){const cdk=dk(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}
                   setSchedules(newScheds);setAddShift(null);flash("Aplicado a todo el mes ✓");
                 }} style={{...ss.btn(C.cardLight,C.blue),flex:1,border:`1px solid ${C.border}`,fontSize:11}}>Todo el mes</button>
