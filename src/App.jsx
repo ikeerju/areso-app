@@ -110,6 +110,41 @@ function generateReport(employees,records,schedules,vacations,documents,f,t){
   return csv;
 }
 
+function HorariosEmpleado({schedules,user,calWeekStart2,setCalWeekStart2,goHome}){
+  const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart2);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),full:DAYS[i],num:d.getDate()});}
+  const shiftWk=(dir)=>{const d=new Date(calWeekStart2);d.setDate(d.getDate()+(dir*7));setCalWeekStart2(dateKey(d));};
+  const col=getAvatarColor(user.id);
+  return(<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}>
+    <button onClick={goHome} style={ss.back}>← Menú</button>
+    <div style={{fontSize:22,fontWeight:700}}>Mi horario</div>
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <button onClick={()=>shiftWk(-1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>←</button>
+      <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:13,fontWeight:700}}>{weekDays[0].num} {MONTHS[new Date(weekDays[0].date).getMonth()]} — {weekDays[6].num} {MONTHS[new Date(weekDays[6].date).getMonth()]}</div>
+      <button onClick={()=>shiftWk(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>→</button>
+    </div>
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      {weekDays.map(d=>{
+        const s=schedules[user.id+"_"+d.date];
+        const isToday=d.date===dateKey();
+        return(<div key={d.date} style={{background:C.card,borderRadius:14,padding:"14px 18px",border:`1px solid ${isToday?C.accent+"55":C.border}`,display:"flex",alignItems:"center",gap:14,background:isToday?C.accent+"0d":C.card}}>
+          <div style={{minWidth:80}}>
+            <div style={{fontFamily:font,fontSize:13,fontWeight:700,color:isToday?C.accent:C.text}}>{d.full}</div>
+            <div style={{fontFamily:font,fontSize:11,color:C.muted}}>{d.num} {MONTHS[new Date(d.date).getMonth()]}</div>
+          </div>
+          {s?<div style={{flex:1,display:"flex",alignItems:"center",gap:10}}>
+            <div style={{background:col+"18",border:`2px solid ${col}`,borderRadius:12,padding:"10px 18px",flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+              <span style={{fontFamily:font,fontSize:16,fontWeight:700,color:col}}>{s.start}</span>
+              <span style={{color:C.dim,fontSize:18}}>→</span>
+              <span style={{fontFamily:font,fontSize:16,fontWeight:700,color:col}}>{s.end}</span>
+            </div>
+          </div>:<div style={{flex:1,fontFamily:font,fontSize:13,color:C.dim,textAlign:"center"}}>Libre</div>}
+          {isToday&&<div style={{fontFamily:font,fontSize:9,color:C.accent,fontWeight:700,background:C.accent+"18",padding:"3px 8px",borderRadius:6}}>HOY</div>}
+        </div>);
+      })}
+    </div>
+  </div>);
+}
+
 export default function App(){
   const [employees,setEmployees]=useState([]);
   const [records,setRecords]=useState({});
@@ -683,40 +718,7 @@ export default function App(){
 
 
     {/* HORARIOS empleado */}
-    {sub==="horarios"&&(()=>{
-      const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart2);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),full:DAYS[i],num:d.getDate()});}
-      const shiftWk=(dir)=>{const d=new Date(calWeekStart2);d.setDate(d.getDate()+(dir*7));setCalWeekStart2(dateKey(d));};
-      const col=getAvatarColor(user.id);
-      return(<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}>
-        <button onClick={goHome} style={ss.back}>← Menú</button>
-        <div style={{fontSize:22,fontWeight:700}}>Mi horario</div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <button onClick={()=>shiftWk(-1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>←</button>
-          <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:13,fontWeight:700}}>{weekDays[0].num} {MONTHS[new Date(weekDays[0].date).getMonth()]} — {weekDays[6].num} {MONTHS[new Date(weekDays[6].date).getMonth()]}</div>
-          <button onClick={()=>shiftWk(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>→</button>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {weekDays.map(d=>{
-            const s=schedules[user.id+"_"+d.date];
-            const isToday=d.date===dateKey();
-            return(<div key={d.date} style={{...ss.statusCard,background:isToday?C.accent+"0d":C.card,borderColor:isToday?C.accent+"55":C.border,padding:"14px 18px"}}>
-              <div style={{minWidth:80}}>
-                <div style={{fontFamily:font,fontSize:13,fontWeight:700,color:isToday?C.accent:C.text}}>{d.full}</div>
-                <div style={{fontFamily:font,fontSize:11,color:C.muted}}>{d.num} {MONTHS[new Date(d.date).getMonth()]}</div>
-              </div>
-              {s?<div style={{flex:1,display:"flex",alignItems:"center",gap:10}}>
-                <div style={{background:col+"18",border:`2px solid ${col}`,borderRadius:12,padding:"10px 18px",flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-                  <span style={{fontFamily:font,fontSize:16,fontWeight:700,color:col}}>{s.start}</span>
-                  <span style={{color:C.dim,fontSize:18}}>→</span>
-                  <span style={{fontFamily:font,fontSize:16,fontWeight:700,color:col}}>{s.end}</span>
-                </div>
-              </div>:<div style={{flex:1,fontFamily:font,fontSize:13,color:C.dim,textAlign:"center"}}>Libre</div>}
-              {isToday&&<div style={{fontFamily:font,fontSize:9,color:C.accent,fontWeight:700,background:C.accent+"18",padding:"3px 8px",borderRadius:6}}>HOY</div>}
-            </div>);
-          })}
-        </div>
-      </div>);
-    })()}
+    {sub==="horarios"&&<HorariosEmpleado schedules={schedules} user={user} calWeekStart2={calWeekStart2} setCalWeekStart2={setCalWeekStart2} goHome={goHome}/>}
 
     {/* FICHAR */}
     {sub==="fichar"&&<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}><button onClick={goHome} style={ss.back}>← Menú</button>
@@ -835,4 +837,4 @@ export default function App(){
     <button style={{...ss.navBtn(false),color:C.red}} onClick={()=>{setUser(null);setView("login");stopCamera();setPhoto(null);}}>{Ic.logout}<span>Salir</span></button>
   </div>
   </div>);
-}s
+}
