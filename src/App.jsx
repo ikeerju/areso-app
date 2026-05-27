@@ -307,7 +307,7 @@ export default function App(){
 
   // ═══ ADMIN PANEL ═══
   if(view==="admin"){
-    const tabs=[{id:"live",l:"📡 Directo"},{id:"monthly",l:"📅 Horarios"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
+    const tabs=[{id:"live",l:"📡 Directo"},{id:"weekly",l:"📅 Semana"},{id:"monthly",l:"📆 Mes"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px 32px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
@@ -410,7 +410,55 @@ export default function App(){
         </div>)}
       </div>}
 
-      {/* HORARIOS — calendario mensual interactivo */}
+      {/* WEEKLY SCHEDULE */}
+      {adminTab==="weekly"&&(()=>{
+        const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),full:DAYS[i],num:d.getDate(),month:MONTHS[d.getMonth()]});}
+        const shiftWeek=(dir)=>{const d=new Date(calWeekStart);d.setDate(d.getDate()+(dir*7));setCalWeekStart(dateKey(d));};
+        const activeEmps=employees.filter(e=>e.active);
+        return(<div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {/* Nav */}
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <button onClick={()=>shiftWeek(-1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>←</button>
+            <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:14,fontWeight:700}}>{weekDays[0].num} {weekDays[0].month} — {weekDays[6].num} {weekDays[6].month}</div>
+            <button onClick={()=>shiftWeek(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>→</button>
+            <button onClick={()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));setCalWeekStart(dateKey(n));}} style={{...ss.btn(C.cardLight,C.accent),width:"auto",border:`1px solid ${C.border}`,padding:"8px 12px",fontSize:11,flexShrink:0}}>Hoy</button>
+          </div>
+          {/* Employee rows */}
+          {activeEmps.map(emp=>{
+            const col=getAvatarColor(emp.id);
+            return(<div key={emp.id} style={{...ss.card,padding:0,overflow:"hidden"}}>
+              {/* Employee header */}
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",borderBottom:`1px solid ${C.border}`,background:C.cardLight}}>
+                <div style={ss.avatar(col,32)}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
+                <div style={{flex:1}}><div style={{fontFamily:font,fontSize:14,fontWeight:700}}>{emp.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>{emp.position||"—"}</div></div>
+              </div>
+              {/* 7 day columns */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)"}}>
+                {weekDays.map(d=>{
+                  const key=emp.id+"_"+d.date;
+                  const s=schedules[key];
+                  const isToday=d.date===dateKey();
+                  const isAdding=addShift?.empId===emp.id&&addShift?.dayKey===d.date;
+                  return(<div key={d.date} onClick={()=>{if(s){setConfirmDelete({empId:emp.id,dayKey:d.date});}else{setAddShift({empId:emp.id,dayKey:d.date});setShiftForm({start:"09:00",end:"17:00"});setConfirmDelete(null);}}} style={{padding:"8px 4px",borderRight:`1px solid ${C.border}22`,background:isToday?C.accent+"0a":isAdding?C.accent+"15":"transparent",cursor:"pointer",textAlign:"center",minHeight:70,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"space-between",transition:"background .1s"}}
+                    onMouseEnter={e=>e.currentTarget.style.background=isToday?C.accent+"18":C.accent+"0d"}
+                    onMouseLeave={e=>e.currentTarget.style.background=isToday?C.accent+"0a":isAdding?C.accent+"15":"transparent"}>
+                    <div>
+                      <div style={{fontFamily:font,fontSize:10,fontWeight:600,color:isToday?C.accent:C.muted}}>{d.label}</div>
+                      <div style={{fontFamily:font,fontSize:14,fontWeight:700,color:isToday?C.accent:C.text}}>{d.num}</div>
+                    </div>
+                    {s?<div style={{background:col+"22",border:`2px solid ${col}`,borderRadius:8,padding:"4px 6px",width:"90%"}}>
+                      <div style={{fontFamily:font,fontSize:11,fontWeight:700,color:col}}>{s.start}</div>
+                      <div style={{fontFamily:font,fontSize:10,color:col+"aa"}}>→ {s.end}</div>
+                    </div>:<div style={{fontFamily:font,fontSize:20,color:C.dim,opacity:.3}}>+</div>}
+                  </div>);
+                })}
+              </div>
+            </div>);
+          })}
+        </div>);
+      })()}
+
+            {/* HORARIOS — calendario mensual interactivo */}
       {adminTab==="monthly"&&(()=>{
         const year=Math.floor(calMonthView/100);const month=calMonthView%100;
         const daysInMonth=new Date(year,month+1,0).getDate();
@@ -499,7 +547,7 @@ export default function App(){
                   {days.map(d=>{
                     const key=emp.id+"_"+dk(d);
                     const s=schedules[key];
-                    const vac=vacations.find(v=>v.empId===emp.id&&(v.status==="approved"||v.status==="pending")&&v.start<=dk(d)&&v.end>=dk(d));
+                    const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=dk(d)&&v.end>=dk(d));
                     const isAdding=addShift?.empId===emp.id&&addShift?.dayKey===dk(d);
                     const isDeleting=confirmDelete?.empId===emp.id&&confirmDelete?.dayKey===dk(d);
                     const bgBase=isToday(d)?C.accent+"15":isWeekend(d)?"#f5f5ff":"transparent";
@@ -633,6 +681,43 @@ export default function App(){
 
   return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:720,margin:"0 auto"}}>
 
+
+    {/* HORARIOS empleado */}
+    {sub==="horarios"&&(()=>{
+      const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart2);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),full:DAYS[i],num:d.getDate()});}
+      const shiftWk=(dir)=>{const d=new Date(calWeekStart2);d.setDate(d.getDate()+(dir*7));setCalWeekStart2(dateKey(d));};
+      const col=getAvatarColor(user.id);
+      return(<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}>
+        <button onClick={goHome} style={ss.back}>← Menú</button>
+        <div style={{fontSize:22,fontWeight:700}}>Mi horario</div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <button onClick={()=>shiftWk(-1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>←</button>
+          <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:13,fontWeight:700}}>{weekDays[0].num} {MONTHS[new Date(weekDays[0].date).getMonth()]} — {weekDays[6].num} {MONTHS[new Date(weekDays[6].date).getMonth()]}</div>
+          <button onClick={()=>shiftWk(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>→</button>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {weekDays.map(d=>{
+            const s=schedules[user.id+"_"+d.date];
+            const isToday=d.date===dateKey();
+            return(<div key={d.date} style={{...ss.statusCard,background:isToday?C.accent+"0d":C.card,borderColor:isToday?C.accent+"55":C.border,padding:"14px 18px"}}>
+              <div style={{minWidth:80}}>
+                <div style={{fontFamily:font,fontSize:13,fontWeight:700,color:isToday?C.accent:C.text}}>{d.full}</div>
+                <div style={{fontFamily:font,fontSize:11,color:C.muted}}>{d.num} {MONTHS[new Date(d.date).getMonth()]}</div>
+              </div>
+              {s?<div style={{flex:1,display:"flex",alignItems:"center",gap:10}}>
+                <div style={{background:col+"18",border:`2px solid ${col}`,borderRadius:12,padding:"10px 18px",flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+                  <span style={{fontFamily:font,fontSize:16,fontWeight:700,color:col}}>{s.start}</span>
+                  <span style={{color:C.dim,fontSize:18}}>→</span>
+                  <span style={{fontFamily:font,fontSize:16,fontWeight:700,color:col}}>{s.end}</span>
+                </div>
+              </div>:<div style={{flex:1,fontFamily:font,fontSize:13,color:C.dim,textAlign:"center"}}>Libre</div>}
+              {isToday&&<div style={{fontFamily:font,fontSize:9,color:C.accent,fontWeight:700,background:C.accent+"18",padding:"3px 8px",borderRadius:6}}>HOY</div>}
+            </div>);
+          })}
+        </div>
+      </div>);
+    })()}
+
     {/* FICHAR */}
     {sub==="fichar"&&<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}><button onClick={goHome} style={ss.back}>← Menú</button>
       <div style={{textAlign:"center"}}><div style={{fontFamily:font,fontSize:40,fontWeight:700,letterSpacing:-2}}>{new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</div><div style={{fontFamily:font,fontSize:11,color:C.muted,marginTop:4,textTransform:"capitalize"}}>{fmtDateLong(new Date())}</div></div>
@@ -697,7 +782,8 @@ export default function App(){
         {/* Modules */}
         <div style={ss.secTitle}>Jornada</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div style={{...ss.moduleCard,gridColumn:"span 2"}} onClick={()=>setSub("fichar")}>{Ic.clock}<span style={{fontSize:14,fontWeight:600}}>Fichar</span></div>
+          <div style={ss.moduleCard} onClick={()=>setSub("fichar")}>{Ic.clock}<span style={{fontSize:14,fontWeight:600}}>Fichar</span></div>
+          <div style={ss.moduleCard} onClick={()=>setSub("horarios")}>{Ic.cal}<span style={{fontSize:14,fontWeight:600}}>Horarios</span></div>
         </div>
         <div style={ss.secTitle}>Comunicación</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
@@ -749,4 +835,4 @@ export default function App(){
     <button style={{...ss.navBtn(false),color:C.red}} onClick={()=>{setUser(null);setView("login");stopCamera();setPhoto(null);}}>{Ic.logout}<span>Salir</span></button>
   </div>
   </div>);
-}
+}s
