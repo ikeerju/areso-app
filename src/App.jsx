@@ -467,26 +467,28 @@ export default function App(){
                 <div style={ss.avatar(col,32)}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
                 <div style={{flex:1}}><div style={{fontFamily:font,fontSize:14,fontWeight:700}}>{emp.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>{emp.position||"—"}</div></div>
               </div>
-              {/* 7 day columns */}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)"}}>
-                {weekDays.map(d=>{
-                  const key=emp.id+"_"+d.date;
-                  const s=schedules[key];
-                  const isToday=d.date===dateKey();
-                  const isAdding=addShift?.empId===emp.id&&addShift?.dayKey===d.date;
-                  return(<div key={d.date} onClick={()=>{if(s){setConfirmDelete({empId:emp.id,dayKey:d.date});}else{setAddShift({empId:emp.id,dayKey:d.date});setShiftForm({start:"09:00",end:"17:00"});setConfirmDelete(null);}}} style={{padding:"8px 4px",borderRight:`1px solid ${C.border}22`,background:isToday?C.accent+"0a":isAdding?C.accent+"15":"transparent",cursor:"pointer",textAlign:"center",minHeight:70,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"space-between",transition:"background .1s"}}
-                    onMouseEnter={e=>e.currentTarget.style.background=isToday?C.accent+"18":C.accent+"0d"}
-                    onMouseLeave={e=>e.currentTarget.style.background=isToday?C.accent+"0a":isAdding?C.accent+"15":"transparent"}>
-                    <div>
-                      <div style={{fontFamily:font,fontSize:10,fontWeight:600,color:isToday?C.accent:C.muted}}>{d.label}</div>
-                      <div style={{fontFamily:font,fontSize:14,fontWeight:700,color:isToday?C.accent:C.text}}>{d.num}</div>
-                    </div>
-                    {s?<div style={{background:col+"22",border:`2px solid ${col}`,borderRadius:8,padding:"4px 6px",width:"90%"}}>
-                      <div style={{fontFamily:font,fontSize:11,fontWeight:700,color:col}}>{s.start}</div>
-                      <div style={{fontFamily:font,fontSize:10,color:col+"aa"}}>→ {s.end}</div>
-                    </div>:<div style={{fontFamily:font,fontSize:20,color:C.dim,opacity:.3}}>+</div>}
-                  </div>);
-                })}
+              {/* 7 day columns — scrollable on mobile */}
+              <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(52px,1fr))",minWidth:364}}>
+                  {weekDays.map(d=>{
+                    const key=emp.id+"_"+d.date;
+                    const s=schedules[key];
+                    const isToday=d.date===dateKey();
+                    const isAdding=addShift?.empId===emp.id&&addShift?.dayKey===d.date;
+                    return(<div key={d.date} onClick={()=>{if(s){setConfirmDelete({empId:emp.id,dayKey:d.date});}else{setAddShift({empId:emp.id,dayKey:d.date});setShiftForm({start:"09:00",end:"17:00"});setConfirmDelete(null);}}} style={{padding:"8px 4px",borderRight:`1px solid ${C.border}22`,background:isToday?C.accent+"0a":isAdding?C.accent+"15":"transparent",cursor:"pointer",textAlign:"center",minHeight:70,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"space-between",transition:"background .1s"}}
+                      onMouseEnter={e=>e.currentTarget.style.background=isToday?C.accent+"18":C.accent+"0d"}
+                      onMouseLeave={e=>e.currentTarget.style.background=isToday?C.accent+"0a":isAdding?C.accent+"15":"transparent"}>
+                      <div>
+                        <div style={{fontFamily:font,fontSize:10,fontWeight:600,color:isToday?C.accent:C.muted}}>{d.label}</div>
+                        <div style={{fontFamily:font,fontSize:14,fontWeight:700,color:isToday?C.accent:C.text}}>{d.num}</div>
+                      </div>
+                      {s?<div style={{background:col+"22",border:`2px solid ${col}`,borderRadius:8,padding:"4px 6px",width:"90%"}}>
+                        <div style={{fontFamily:font,fontSize:11,fontWeight:700,color:col}}>{s.start}</div>
+                        <div style={{fontFamily:font,fontSize:10,color:col+"aa"}}>→ {s.end}</div>
+                      </div>:<div style={{fontFamily:font,fontSize:20,color:C.dim,opacity:.3}}>+</div>}
+                    </div>);
+                  })}
+                </div>
               </div>
             </div>);
           })}
