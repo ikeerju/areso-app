@@ -346,7 +346,7 @@ export default function App(){
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px 32px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
-      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>setAdminTab(t.id)} style={{padding:"8px 14px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:font,fontSize:11,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#000":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
+      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>{setAdminTab(t.id);setAddShift(null);setConfirmDelete(null);}} style={{padding:"8px 14px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:font,fontSize:11,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#000":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
 
       {/* LIVE */}
       {adminTab==="live"&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -610,69 +610,69 @@ export default function App(){
             <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:2,background:C.green+"44",border:`1.5px solid ${C.green}`}}/><span style={{fontFamily:font,fontSize:10,color:C.muted}}>Vacaciones</span></div>
             <div style={{fontFamily:font,fontSize:10,color:C.dim,marginLeft:"auto"}}>Clic en celda vacía → añadir · Clic en turno → borrar</div>
           </div>
+        </div>);
+      })()}
 
-          {/* ── MODAL añadir turno ── */}
-          {addShift&&(()=>{
-            const emp=employees.find(e=>e.id===addShift.empId);
-            const col=getAvatarColor(addShift.empId);
-            const fmtDay=(dk)=>{const d=new Date(dk);return d.toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});};
-            return(<div onClick={e=>{if(e.target===e.currentTarget)setAddShift(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(3px)"}}>
-              <div style={{background:C.card,borderRadius:24,padding:0,width:"100%",maxWidth:420,boxShadow:"0 24px 60px rgba(0,0,0,.25)",overflow:"hidden",animation:"popIn .2s"}}>
-                {/* Header */}
-                <div style={{background:`linear-gradient(135deg,${col},${col}cc)`,padding:"24px 24px 20px",position:"relative"}}>
-                  <button onClick={()=>setAddShift(null)} style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,.2)",border:"none",borderRadius:"50%",width:32,height:32,color:"#fff",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
-                  <div style={{display:"flex",alignItems:"center",gap:12}}>
-                    <div style={{width:48,height:48,borderRadius:"50%",background:"rgba(255,255,255,.25)",border:"2px solid rgba(255,255,255,.5)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:18,fontWeight:700,color:"#fff"}}>{emp?.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
-                    <div>
-                      <div style={{fontFamily:font,fontSize:18,fontWeight:700,color:"#fff"}}>{emp?.name.split(" ")[0]}</div>
-                      <div style={{fontFamily:font,fontSize:12,color:"rgba(255,255,255,.8)",textTransform:"capitalize"}}>{fmtDay(addShift.dayKey)}</div>
-                    </div>
-                  </div>
-                </div>
-                {/* Body */}
-                <div style={{padding:"24px"}}>
-                  <div style={{display:"flex",gap:12,marginBottom:20}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontFamily:font,fontSize:11,fontWeight:600,color:C.muted,letterSpacing:1,marginBottom:6}}>ENTRADA</div>
-                      <input type="time" value={shiftForm.start} onChange={e=>setShiftForm({...shiftForm,start:e.target.value})} style={{...ss.input,fontSize:20,fontWeight:700,textAlign:"center",padding:"12px",color:C.accent,border:`2px solid ${C.accent}33`,borderRadius:12}}/>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",paddingTop:24,color:C.dim,fontSize:20}}>→</div>
-                    <div style={{flex:1}}>
-                      <div style={{fontFamily:font,fontSize:11,fontWeight:600,color:C.muted,letterSpacing:1,marginBottom:6}}>SALIDA</div>
-                      <input type="time" value={shiftForm.end} onChange={e=>setShiftForm({...shiftForm,end:e.target.value})} style={{...ss.input,fontSize:20,fontWeight:700,textAlign:"center",padding:"12px",color:C.accent,border:`2px solid ${C.accent}33`,borderRadius:12}}/>
-                    </div>
-                  </div>
-                  {/* Botones */}
-                  <button onClick={async()=>{await DB.setSchedule(addShift.empId,addShift.dayKey,shiftForm.start,shiftForm.end);setSchedules({...schedules,[addShift.empId+"_"+addShift.dayKey]:{empId:addShift.empId,start:shiftForm.start,end:shiftForm.end}});setAddShift(null);flash("Turno guardado ✓");}} style={{...ss.btn(col,"#fff"),borderRadius:14,marginBottom:10,fontSize:15,fontWeight:700,padding:"14px"}}>✓ Guardar solo este día</button>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                    <button onClick={async()=>{const newScheds={...schedules};const cd=new Date(addShift.dayKey);const dw=cd.getDay()||7;const mon=new Date(cd);mon.setDate(cd.getDate()-(dw-1));for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const cdk=dateKey(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}setSchedules(newScheds);setAddShift(null);flash("Semana aplicada ✓");}} style={{...ss.btn(C.cardLight,C.green),border:`1.5px solid ${C.green}44`,borderRadius:12,padding:"11px",fontSize:13}}>📅 Esta semana</button>
-                    <button onClick={async()=>{const newScheds={...schedules};for(let d=1;d<=daysInMonth;d++){const cdk=dk(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}setSchedules(newScheds);setAddShift(null);flash("Mes aplicado ✓");}} style={{...ss.btn(C.cardLight,C.blue),border:`1.5px solid ${C.blue}44`,borderRadius:12,padding:"11px",fontSize:13}}>📆 Todo el mes</button>
-                  </div>
+      {/* ── MODALES compartidos semana + mes ── */}
+      {addShift&&(()=>{
+        const emp=employees.find(e=>e.id===addShift.empId);
+        const col=getAvatarColor(addShift.empId);
+        const fmtDay=(dk)=>{const d=new Date(dk);return d.toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});};
+        const monthOfShift=new Date(addShift.dayKey).getMonth();
+        const yearOfShift=new Date(addShift.dayKey).getFullYear();
+        const daysInShiftMonth=new Date(yearOfShift,monthOfShift+1,0).getDate();
+        const dkMonth=(d)=>`${yearOfShift}-${String(monthOfShift+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+        return(<div onClick={e=>{if(e.target===e.currentTarget)setAddShift(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(3px)"}}>
+          <div style={{background:C.card,borderRadius:24,padding:0,width:"100%",maxWidth:420,boxShadow:"0 24px 60px rgba(0,0,0,.25)",overflow:"hidden",animation:"popIn .2s"}}>
+            <div style={{background:`linear-gradient(135deg,${col},${col}cc)`,padding:"24px 24px 20px",position:"relative"}}>
+              <button onClick={()=>setAddShift(null)} style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,.2)",border:"none",borderRadius:"50%",width:32,height:32,color:"#fff",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:48,height:48,borderRadius:"50%",background:"rgba(255,255,255,.25)",border:"2px solid rgba(255,255,255,.5)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:18,fontWeight:700,color:"#fff"}}>{emp?.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
+                <div>
+                  <div style={{fontFamily:font,fontSize:18,fontWeight:700,color:"#fff"}}>{emp?.name.split(" ")[0]}</div>
+                  <div style={{fontFamily:font,fontSize:12,color:"rgba(255,255,255,.8)",textTransform:"capitalize"}}>{fmtDay(addShift.dayKey)}</div>
                 </div>
               </div>
-            </div>);
-          })()}
-
-          {/* ── MODAL borrar turno ── */}
-          {confirmDelete&&(()=>{
-            const emp=employees.find(e=>e.id===confirmDelete.empId);
-            const col=getAvatarColor(confirmDelete.empId);
-            const s=schedules[confirmDelete.empId+"_"+confirmDelete.dayKey];
-            return(<div onClick={e=>{if(e.target===e.currentTarget)setConfirmDelete(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(3px)"}}>
-              <div style={{background:C.card,borderRadius:24,width:"100%",maxWidth:360,boxShadow:"0 24px 60px rgba(0,0,0,.25)",overflow:"hidden",animation:"popIn .2s"}}>
-                <div style={{background:`linear-gradient(135deg,${C.red},#ff6b6b)`,padding:"24px",textAlign:"center"}}>
-                  <div style={{fontSize:32,marginBottom:8}}>🗑</div>
-                  <div style={{fontFamily:font,fontSize:16,fontWeight:700,color:"#fff"}}>¿Borrar turno?</div>
-                  <div style={{fontFamily:font,fontSize:13,color:"rgba(255,255,255,.8)",marginTop:4}}>{emp?.name.split(" ")[0]} · {confirmDelete.dayKey}</div>
-                  {s&&<div style={{fontFamily:font,fontSize:20,fontWeight:700,color:"#fff",marginTop:8}}>{s.start} → {s.end}</div>}
+            </div>
+            <div style={{padding:"24px"}}>
+              <div style={{display:"flex",gap:12,marginBottom:20}}>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:font,fontSize:11,fontWeight:600,color:C.muted,letterSpacing:1,marginBottom:6}}>ENTRADA</div>
+                  <input type="time" value={shiftForm.start} onChange={e=>setShiftForm({...shiftForm,start:e.target.value})} style={{...ss.input,fontSize:20,fontWeight:700,textAlign:"center",padding:"12px",color:C.accent,border:`2px solid ${C.accent}33`,borderRadius:12}}/>
                 </div>
-                <div style={{padding:"20px",display:"flex",gap:10}}>
-                  <button onClick={()=>setConfirmDelete(null)} style={{...ss.btn(C.cardLight,C.muted),flex:1,border:`1px solid ${C.border}`,borderRadius:12}}>Cancelar</button>
-                  <button onClick={async()=>{const key=confirmDelete.empId+"_"+confirmDelete.dayKey;await DB.deleteSchedule(confirmDelete.empId,confirmDelete.dayKey);const ns={...schedules};delete ns[key];setSchedules(ns);setConfirmDelete(null);flash("Turno borrado");}} style={{...ss.btn(C.red,"#fff"),flex:1,borderRadius:12}}>Borrar</button>
+                <div style={{display:"flex",alignItems:"center",paddingTop:24,color:C.dim,fontSize:20}}>→</div>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:font,fontSize:11,fontWeight:600,color:C.muted,letterSpacing:1,marginBottom:6}}>SALIDA</div>
+                  <input type="time" value={shiftForm.end} onChange={e=>setShiftForm({...shiftForm,end:e.target.value})} style={{...ss.input,fontSize:20,fontWeight:700,textAlign:"center",padding:"12px",color:C.accent,border:`2px solid ${C.accent}33`,borderRadius:12}}/>
                 </div>
               </div>
-            </div>);
-          })()}
+              <button onClick={async()=>{await DB.setSchedule(addShift.empId,addShift.dayKey,shiftForm.start,shiftForm.end);setSchedules({...schedules,[addShift.empId+"_"+addShift.dayKey]:{empId:addShift.empId,start:shiftForm.start,end:shiftForm.end}});setAddShift(null);flash("Turno guardado ✓");}} style={{...ss.btn(col,"#fff"),borderRadius:14,marginBottom:10,fontSize:15,fontWeight:700,padding:"14px"}}>✓ Guardar solo este día</button>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <button onClick={async()=>{const newScheds={...schedules};const cd=new Date(addShift.dayKey);const dw=cd.getDay()||7;const mon=new Date(cd);mon.setDate(cd.getDate()-(dw-1));for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const cdk=dateKey(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}setSchedules(newScheds);setAddShift(null);flash("Semana aplicada ✓");}} style={{...ss.btn(C.cardLight,C.green),border:`1.5px solid ${C.green}44`,borderRadius:12,padding:"11px",fontSize:13}}>📅 Esta semana</button>
+                <button onClick={async()=>{const newScheds={...schedules};for(let d=1;d<=daysInShiftMonth;d++){const cdk=dkMonth(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}setSchedules(newScheds);setAddShift(null);flash("Mes aplicado ✓");}} style={{...ss.btn(C.cardLight,C.blue),border:`1.5px solid ${C.blue}44`,borderRadius:12,padding:"11px",fontSize:13}}>📆 Todo el mes</button>
+              </div>
+            </div>
+          </div>
+        </div>);
+      })()}
+
+      {confirmDelete&&(()=>{
+        const emp=employees.find(e=>e.id===confirmDelete.empId);
+        const col=getAvatarColor(confirmDelete.empId);
+        const s=schedules[confirmDelete.empId+"_"+confirmDelete.dayKey];
+        return(<div onClick={e=>{if(e.target===e.currentTarget)setConfirmDelete(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(3px)"}}>
+          <div style={{background:C.card,borderRadius:24,width:"100%",maxWidth:360,boxShadow:"0 24px 60px rgba(0,0,0,.25)",overflow:"hidden",animation:"popIn .2s"}}>
+            <div style={{background:`linear-gradient(135deg,${C.red},#ff6b6b)`,padding:"24px",textAlign:"center"}}>
+              <div style={{fontSize:32,marginBottom:8}}>🗑</div>
+              <div style={{fontFamily:font,fontSize:16,fontWeight:700,color:"#fff"}}>¿Borrar turno?</div>
+              <div style={{fontFamily:font,fontSize:13,color:"rgba(255,255,255,.8)",marginTop:4}}>{emp?.name.split(" ")[0]} · {confirmDelete.dayKey}</div>
+              {s&&<div style={{fontFamily:font,fontSize:20,fontWeight:700,color:"#fff",marginTop:8}}>{s.start} → {s.end}</div>}
+            </div>
+            <div style={{padding:"20px",display:"flex",gap:10}}>
+              <button onClick={()=>setConfirmDelete(null)} style={{...ss.btn(C.cardLight,C.muted),flex:1,border:`1px solid ${C.border}`,borderRadius:12}}>Cancelar</button>
+              <button onClick={async()=>{const key=confirmDelete.empId+"_"+confirmDelete.dayKey;await DB.deleteSchedule(confirmDelete.empId,confirmDelete.dayKey);const ns={...schedules};delete ns[key];setSchedules(ns);setConfirmDelete(null);flash("Turno borrado");}} style={{...ss.btn(C.red,"#fff"),flex:1,borderRadius:12}}>Borrar</button>
+            </div>
+          </div>
         </div>);
       })()}
 
