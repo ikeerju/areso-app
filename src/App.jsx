@@ -606,12 +606,12 @@ export default function App(){
                   const raw=schedules[emp.id+"_"+d];
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
-                  if(!vac&&shifts.length===0)return(<div key={emp.id} style={{height:3,marginBottom:1,background:col+"18",borderRadius:2}}/>);
-                  return(<div key={emp.id} style={{marginBottom:1}}>
+                  if(!vac&&shifts.length===0)return(<div key={emp.id} style={{height:28,marginBottom:1}}/>);
+                  return(<div key={emp.id} style={{height:28,marginBottom:1}}>
                     {vac?<div style={{height:26,background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",display:"flex",alignItems:"center",paddingLeft:4,gap:4}}>
                       <span style={{fontSize:9}}>🏖</span>
                       <span style={{fontFamily:font,fontSize:8,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
-                    </div>:<div style={{background:col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"2px 4px"}}>
+                    </div>:<div style={{height:26,background:col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"2px 4px"}}>
                       <div style={{fontFamily:font,fontSize:8,color:col,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
                       <div style={{fontFamily:font,fontSize:7,color:col+"cc",overflow:"hidden",whiteSpace:"nowrap"}}>{shifts[0].start}–{shifts[0].end}{shifts.length>1?` +${shifts.length-1}`:""}</div>
                     </div>}
