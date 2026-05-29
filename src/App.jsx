@@ -599,16 +599,20 @@ export default function App(){
               const d=dk(day);
               const today=d===dateKey();
               const isWeekend=new Date(year,month,day).getDay()===0||new Date(year,month,day).getDay()===6;
+              // Get the week this day belongs to (row index in the grid)
+              const weekIdx=Math.floor((i)/7);
+              // Get all days in this week
+              const weekStart=weekIdx*7;
+              const weekDaysInRow=cells.slice(weekStart,weekStart+7).filter(x=>x);
               return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column",gap:1}}>
                 <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
                 {activeEmps.filter(emp=>{
-                  // Only show employee if they work or have vacation at least one day this month
-                  return cells.some(day=>{
-                    if(!day)return false;
-                    const d=dk(day);
-                    const raw=schedules[emp.id+"_"+d];
+                  // Only show if works at least one day THIS WEEK
+                  return weekDaysInRow.some(wd=>{
+                    const wdk=dk(wd);
+                    const raw=schedules[emp.id+"_"+wdk];
                     const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
-                    const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
+                    const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=wdk&&v.end>=wdk);
                     return shifts.length>0||!!vac;
                   });
                 }).map(emp=>{
@@ -620,10 +624,10 @@ export default function App(){
                     {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"2px 4px",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{fontSize:9}}>🏖</span>
                       <span style={{fontFamily:font,fontSize:8,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
-                    </div>:shifts.length>0?<div style={{height:"100%",background:col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"2px 4px"}}>
+                    </div>:shifts.length>0?<div style={{height:"100%",background:col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"2px 4px",display:"flex",flexDirection:"column",justifyContent:"center"}}>
                       <div style={{fontFamily:font,fontSize:8,color:col,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
                       <div style={{fontFamily:font,fontSize:7,color:col+"cc",overflow:"hidden",whiteSpace:"nowrap"}}>{shifts[0].start}–{shifts[0].end}{shifts.length>1?` +${shifts.length-1}`:""}</div>
-                    </div>:null}
+                    </div>:<div style={{height:"100%"}}/>}
                   </div>);
                 })}
               </div>);
