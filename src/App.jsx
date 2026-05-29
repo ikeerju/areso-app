@@ -623,7 +623,7 @@ export default function App(){
                   const raw=schedules[emp.id+"_"+d];
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
-                  return(<div key={emp.id} style={{height:40,marginBottom:2,flexShrink:0}}>
+                  return(<div key={emp.id} style={{height:52,marginBottom:2,flexShrink:0}}>
                     {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{fontSize:11}}>🏖</span>
                       <span style={{fontFamily:font,fontSize:10,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
@@ -822,8 +822,7 @@ export default function App(){
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
                   const isMe=emp.id===user.id;
-                  const cellH=vac?40:shifts.length>1?40+(shifts.length-1)*16:40;
-                  return(<div key={emp.id} style={{height:cellH,marginBottom:2,flexShrink:0}}>
+                  return(<div key={emp.id} style={{height:52,marginBottom:2,flexShrink:0}}>
                     {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{fontSize:11}}>🏖</span>
                       <span style={{fontFamily:font,fontSize:10,color:C.green,fontWeight:700}}>{emp.name.split(" ")[0]}</span>
