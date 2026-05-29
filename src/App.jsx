@@ -17,9 +17,9 @@ const DB = {
   async addClockIn(rec) { await sb.from('areso_clockins').insert({employee_id:rec.empId,type:rec.type,time:new Date(rec.time).toISOString(),photo_url:rec.photo||null}); },
   async deleteClockIn(id) { await sb.from('areso_clockins').delete().eq('id',id); },
   async updateClockIn(id,time) { await sb.from('areso_clockins').update({time:new Date(time).toISOString()}).eq('id',id); },
-  async getSchedules() { const {data}=await sb.from('areso_schedules').select('*'); const scheds={};(data||[]).forEach(s=>{scheds[s.employee_id+"_"+s.date_key]={id:s.id,empId:s.employee_id,start:s.start_time,end:s.end_time};});return scheds; },
-  async setSchedule(empId,dateKey,start,end) { const {data:existing}=await sb.from('areso_schedules').select('id').eq('employee_id',empId).eq('date_key',dateKey); if(existing&&existing.length>0){await sb.from('areso_schedules').update({start_time:start,end_time:end}).eq('id',existing[0].id);}else{await sb.from('areso_schedules').insert({employee_id:empId,date_key:dateKey,start_time:start,end_time:end});} },
-  async deleteSchedule(empId,dateKey) { await sb.from('areso_schedules').delete().eq('employee_id',empId).eq('date_key',dateKey); },
+  async getSchedules() { const {data}=await sb.from('areso_schedules').select('*').order('shift_index'); const scheds={};(data||[]).forEach(s=>{const key=s.employee_id+"_"+s.date_key;if(!scheds[key])scheds[key]=[];scheds[key].push({id:s.id,empId:s.employee_id,start:s.start_time,end:s.end_time,shiftIndex:s.shift_index});});return scheds; },
+  async setSchedule(empId,dateKey,start,end,shiftIndex=0) { const {data:existing}=await sb.from('areso_schedules').select('id').eq('employee_id',empId).eq('date_key',dateKey).eq('shift_index',shiftIndex); if(existing&&existing.length>0){await sb.from('areso_schedules').update({start_time:start,end_time:end}).eq('id',existing[0].id);}else{await sb.from('areso_schedules').insert({employee_id:empId,date_key:dateKey,start_time:start,end_time:end,shift_index:shiftIndex});} },
+  async deleteSchedule(empId,dateKey,shiftIndex=null) { const q=sb.from('areso_schedules').delete().eq('employee_id',empId).eq('date_key',dateKey); if(shiftIndex!==null)await q.eq('shift_index',shiftIndex);else await q; },
   async getVacations() { const {data}=await sb.from('areso_vacations').select('*').order('id',{ascending:false}); return (data||[]).map(v=>({id:v.id,empId:v.employee_id,start:v.start_date,end:v.end_date,status:v.status,notes:v.notes})); },
   async addVacation(vac) { await sb.from('areso_vacations').insert({employee_id:vac.empId,start_date:vac.start,end_date:vac.end,status:'pending',notes:vac.notes}); },
   async updateVacation(id,status) { await sb.from('areso_vacations').update({status}).eq('id',id); },
@@ -41,7 +41,7 @@ const fmtDur=ms=>{if(!ms||ms<0)return"0h 00m";const h=Math.floor(ms/3600000),m=M
 const getWorked=(records,eid,dk)=>{const r=(records[dk]||[]).filter(x=>x.empId===eid).sort((a,b)=>a.time-b.time);let t=0,li=null;for(const x of r){if(x.type==="in")li=x.time;else if(x.type==="out"&&li){t+=x.time-li;li=null;}}if(li)t+=Date.now()-li;return t;};
 const getStatus=(records,eid)=>{const r=(records[dateKey()]||[]).filter(x=>x.empId===eid).sort((a,b)=>a.time-b.time);if(!r.length)return"out";return r[r.length-1].type==="in"?"in":"out";};
 const getLastRec=(records,eid)=>{const r=(records[dateKey()]||[]).filter(x=>x.empId===eid).sort((a,b)=>a.time-b.time);return r.length?r[r.length-1]:null;};
-const getNextSched=(scheds,eid)=>{const now=new Date();for(let i=0;i<14;i++){const d=new Date(now);d.setDate(d.getDate()+i);const key=eid+"_"+dateKey(d);const s=scheds[key];if(s)return{day:DAYS[(d.getDay()+6)%7],start:s.start,end:s.end,isToday:i===0};}return null;};
+const getNextSched=(scheds,eid)=>{const now=new Date();for(let i=0;i<14;i++){const d=new Date(now);d.setDate(d.getDate()+i);const key=eid+"_"+dateKey(d);const raw=scheds[key];const s=Array.isArray(raw)?raw[0]:raw;if(s)return{day:DAYS[(d.getDay()+6)%7],start:s.start,end:s.end,isToday:i===0};}return null;};
 
 // Birthday helpers
 const getUpcomingBirthdays=(emps)=>{
@@ -680,8 +680,8 @@ export default function App(){
               <button onClick={async()=>{
                 const newShift={start:shiftForm.start,end:shiftForm.end};
                 const allShifts=[...existingShifts,newShift].sort((a,b)=>a.start.localeCompare(b.start));
-                await DB.setSchedule(addShift.empId,addShift.dayKey,allShifts[0].start,allShifts[0].end);
-                setSchedules({...schedules,[addShift.empId+"_"+addShift.dayKey]:allShifts.length===1?allShifts[0]:allShifts});
+                for(let i=0;i<allShifts.length;i++){await DB.setSchedule(addShift.empId,addShift.dayKey,allShifts[i].start,allShifts[i].end,i);}
+                setSchedules({...schedules,[addShift.empId+"_"+addShift.dayKey]:allShifts});
                 setAddShift(null);flash(isSplit?"Turno partido añadido ✓":"Turno guardado ✓");
               }} style={{...ss.btn(col,"#fff"),borderRadius:12,marginBottom:8,fontSize:14,fontWeight:700,padding:"13px"}}>{isSplit?"+ Añadir turno partido":"✓ Guardar este día"}</button>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
@@ -715,8 +715,10 @@ export default function App(){
               <button onClick={async()=>{
                 const key=confirmDelete.empId+"_"+confirmDelete.dayKey;
                 const remaining=shifts.filter((_,i)=>i!==idx);
-                if(remaining.length===0){await DB.deleteSchedule(confirmDelete.empId,confirmDelete.dayKey);const ns={...schedules};delete ns[key];setSchedules(ns);}
-                else{await DB.setSchedule(confirmDelete.empId,confirmDelete.dayKey,remaining[0].start,remaining[0].end);setSchedules({...schedules,[key]:remaining.length===1?remaining[0]:remaining});}
+                await DB.deleteSchedule(confirmDelete.empId,confirmDelete.dayKey);
+                for(let i=0;i<remaining.length;i++){await DB.setSchedule(confirmDelete.empId,confirmDelete.dayKey,remaining[i].start,remaining[i].end,i);}
+                if(remaining.length===0){const ns={...schedules};delete ns[key];setSchedules(ns);}
+                else{setSchedules({...schedules,[key]:remaining});}
                 setConfirmDelete(null);flash("Turno borrado");
               }} style={{...ss.btn(C.red,"#fff"),flex:1,borderRadius:10}}>Borrar</button>
             </div>
