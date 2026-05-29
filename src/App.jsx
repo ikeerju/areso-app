@@ -629,8 +629,6 @@ export default function App(){
                       <div style={{fontFamily:font,fontSize:9,color:col+"dd",overflow:"hidden",whiteSpace:"nowrap"}}>{shifts.map(s=>`${s.start}–${s.end}`).join(" / ")}</div>
                     </div>:<div style={{height:"100%"}}/>}
                   </div>);
-                    </div>:<div style={{height:"100%"}}/>}
-                  </div>);
                 })}
               </div>);
             })}
