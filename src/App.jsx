@@ -343,7 +343,7 @@ export default function App(){
 
   // ═══ ADMIN PANEL ═══
   if(view==="admin"){
-    const tabs=[{id:"live",l:"📡 Directo"},{id:"schedule",l:"📅 Horarios"},{id:"overview",l:"👁 Vista"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
+    const tabs=[{id:"live",l:"📡 Directo"},{id:"schedule",l:"📅 Horarios"},{id:"overview",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px 32px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
@@ -583,7 +583,7 @@ export default function App(){
         for(let i=0;i<startDow;i++)cells.push(null);
         for(let d=1;d<=daysInMonth;d++)cells.push(d);
         const dk=(d)=>`${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-        const slotH=22; // height per employee slot in px
+        const slotH=28; // height per employee slot in px
         return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>←</button>
@@ -599,20 +599,22 @@ export default function App(){
               const d=dk(day);
               const today=d===dateKey();
               const isWeekend=new Date(year,month,day).getDay()===0||new Date(year,month,day).getDay()===6;
-              return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column"}}>
+              return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column",gap:1}}>
                 <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
                 {activeEmps.map(emp=>{
                   const col=getAvatarColor(emp.id);
                   const raw=schedules[emp.id+"_"+d];
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
-                  return(<div key={emp.id} style={{height:slotH,marginBottom:2,display:"flex",alignItems:"center"}}>
-                    {vac?<div style={{width:"100%",height:slotH-2,background:C.green+"33",borderLeft:`2px solid ${C.green}`,borderRadius:"0 3px 3px 0",display:"flex",alignItems:"center",paddingLeft:2}}>
-                      <span style={{fontFamily:font,fontSize:7,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🏖{emp.name.split(" ")[0]}</span>
-                    </div>:shifts.length>0?<div style={{width:"100%",height:slotH-2,background:col+"22",borderLeft:`2px solid ${col}`,borderRadius:"0 3px 3px 0",display:"flex",flexDirection:"column",justifyContent:"center",paddingLeft:2}}>
-                      <span style={{fontFamily:font,fontSize:7,color:col,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
-                      <span style={{fontFamily:font,fontSize:6,color:col+"bb",overflow:"hidden",whiteSpace:"nowrap"}}>{shifts[0].start}–{shifts[0].end}{shifts.length>1?` +${shifts.length-1}`:""}</span>
-                    </div>:<div style={{width:"100%",height:slotH-2}}/>}
+                  if(!vac&&shifts.length===0)return null;
+                  return(<div key={emp.id} style={{marginBottom:1}}>
+                    {vac?<div style={{height:26,background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",display:"flex",alignItems:"center",paddingLeft:4,gap:4}}>
+                      <span style={{fontSize:9}}>🏖</span>
+                      <span style={{fontFamily:font,fontSize:8,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
+                    </div>:shifts.length>0?<div style={{background:col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"2px 4px"}}>
+                      <div style={{fontFamily:font,fontSize:8,color:col,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
+                      <div style={{fontFamily:font,fontSize:7,color:col+"cc",overflow:"hidden",whiteSpace:"nowrap"}}>{shifts[0].start}–{shifts[0].end}{shifts.length>1?` +${shifts.length-1}`:""}</div>
+                    </div>:null}
                   </div>);
                 })}
               </div>);
