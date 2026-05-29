@@ -583,7 +583,7 @@ export default function App(){
         for(let i=0;i<startDow;i++)cells.push(null);
         for(let d=1;d<=daysInMonth;d++)cells.push(d);
         const dk=(d)=>`${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-        const slotH=18; // height per employee slot in px
+        const slotH=22; // height per employee slot in px
         return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>←</button>
@@ -611,7 +611,7 @@ export default function App(){
                       <span style={{fontFamily:font,fontSize:7,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🏖{emp.name.split(" ")[0]}</span>
                     </div>:shifts.length>0?<div style={{width:"100%",height:slotH-2,background:col+"22",borderLeft:`2px solid ${col}`,borderRadius:"0 3px 3px 0",display:"flex",flexDirection:"column",justifyContent:"center",paddingLeft:2}}>
                       <span style={{fontFamily:font,fontSize:7,color:col,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
-                      <span style={{fontFamily:font,fontSize:6,color:col+"aa"}}>{shifts[0].start}{shifts.length>1?"+":""}</span>
+                      <span style={{fontFamily:font,fontSize:6,color:col+"bb",overflow:"hidden",whiteSpace:"nowrap"}}>{shifts[0].start}–{shifts[0].end}{shifts.length>1?` +${shifts.length-1}`:""}</span>
                     </div>:<div style={{width:"100%",height:slotH-2}}/>}
                   </div>);
                 })}
