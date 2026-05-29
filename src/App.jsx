@@ -629,7 +629,7 @@ export default function App(){
                       <span style={{fontFamily:font,fontSize:10,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
                     </div>:shifts.length>0?<div style={{height:"100%",background:col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",flexDirection:"column",justifyContent:"center"}}>
                       <div style={{fontFamily:font,fontSize:10,color:col,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
-                      <div style={{fontFamily:font,fontSize:9,color:col+"dd",overflow:"hidden",whiteSpace:"nowrap"}}>{shifts.map(s=>`${s.start}–${s.end}`).join(" / ")}</div>
+                      {shifts.map((s,si)=><div key={si} style={{fontFamily:font,fontSize:9,color:col+"dd",overflow:"hidden",whiteSpace:"nowrap"}}>{s.start}–{s.end}</div>)}
                     </div>:<div style={{height:"100%"}}/>}
                   </div>);
                 })}
