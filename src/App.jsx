@@ -601,12 +601,22 @@ export default function App(){
               const isWeekend=new Date(year,month,day).getDay()===0||new Date(year,month,day).getDay()===6;
               return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column",gap:1}}>
                 <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
-                {activeEmps.map(emp=>{
+                {activeEmps.filter(emp=>{
+                  // Only show employee if they work or have vacation at least one day this month
+                  return cells.some(day=>{
+                    if(!day)return false;
+                    const d=dk(day);
+                    const raw=schedules[emp.id+"_"+d];
+                    const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+                    const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
+                    return shifts.length>0||!!vac;
+                  });
+                }).map(emp=>{
                   const col=getAvatarColor(emp.id);
                   const raw=schedules[emp.id+"_"+d];
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
-                  return(<div key={emp.id} style={{height:(!vac&&shifts.length===0)?4:30,marginBottom:(!vac&&shifts.length===0)?0:2,flexShrink:0}}>
+                  return(<div key={emp.id} style={{height:30,marginBottom:2,flexShrink:0}}>
                     {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"2px 4px",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{fontSize:9}}>🏖</span>
                       <span style={{fontFamily:font,fontSize:8,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
