@@ -185,7 +185,8 @@ export default function App(){
   const [addShift,setAddShift]=useState(null);
   const [confirmDelete,setConfirmDelete]=useState(null);
   const [shiftForm,setShiftForm]=useState({start:"09:00",end:"17:00"});
-  const [calMonthView,setCalMonthView]=useState(()=>{const n=new Date();return n.getFullYear()*100+n.getMonth();});
+  const [calMonthView,setCalMonthView]=useState(()=>{const n=new Date();return n.getFullYear()*100+n.getMonth()});
+  const [scheduleView,setScheduleView]=useState("week"); // "week" | "month"
   const [vacForm,setVacForm]=useState({start:"",end:"",notes:""});
   const [docForm,setDocForm]=useState({type:"medical",notes:""});
   const [docFile,setDocFile]=useState(null);
@@ -342,7 +343,7 @@ export default function App(){
 
   // ═══ ADMIN PANEL ═══
   if(view==="admin"){
-    const tabs=[{id:"live",l:"📡 Directo"},{id:"weekly",l:"📅 Semana"},{id:"monthly",l:"📆 Mes"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
+    const tabs=[{id:"live",l:"📡 Directo"},{id:"schedule",l:"📅 Horarios"},{id:"overview",l:"👁 Vista"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px 32px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
@@ -446,60 +447,54 @@ export default function App(){
       </div>}
 
       {/* WEEKLY SCHEDULE */}
-      {adminTab==="weekly"&&(()=>{
-        const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),full:DAYS[i],num:d.getDate(),month:MONTHS[d.getMonth()]});}
-        const shiftWeek=(dir)=>{const d=new Date(calWeekStart);d.setDate(d.getDate()+(dir*7));setCalWeekStart(dateKey(d));};
+      {adminTab==="schedule"&&(()=>{
         const activeEmps=employees.filter(e=>e.active);
-        return(<div style={{display:"flex",flexDirection:"column",gap:14}}>
-          {/* Nav */}
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <button onClick={()=>shiftWeek(-1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>←</button>
-            <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:14,fontWeight:700}}>{weekDays[0].num} {weekDays[0].month} — {weekDays[6].num} {weekDays[6].month}</div>
-            <button onClick={()=>shiftWeek(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>→</button>
-            <button onClick={()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));setCalWeekStart(dateKey(n));}} style={{...ss.btn(C.cardLight,C.accent),width:"auto",border:`1px solid ${C.border}`,padding:"8px 12px",fontSize:11,flexShrink:0}}>Hoy</button>
-          </div>
-          {/* Employee rows */}
-          {activeEmps.map(emp=>{
-            const col=getAvatarColor(emp.id);
-            return(<div key={emp.id} style={{...ss.card,padding:0,overflow:"hidden"}}>
-              {/* Employee header */}
-              <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 16px",borderBottom:`1px solid ${C.border}`,background:C.cardLight}}>
-                <div style={ss.avatar(col,32)}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
-                <div style={{flex:1}}><div style={{fontFamily:font,fontSize:14,fontWeight:700}}>{emp.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>{emp.position||"—"}</div></div>
-              </div>
-              {/* 7 day columns — scrollable on mobile */}
-              <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(52px,1fr))",minWidth:364}}>
-                  {weekDays.map(d=>{
-                    const key=emp.id+"_"+d.date;
-                    const s=schedules[key];
-                    const isToday=d.date===dateKey();
-                    const isAdding=addShift?.empId===emp.id&&addShift?.dayKey===d.date;
-                    return(<div key={d.date} onClick={()=>{if(s){setConfirmDelete({empId:emp.id,dayKey:d.date});}else{setAddShift({empId:emp.id,dayKey:d.date});setShiftForm({start:"09:00",end:"17:00"});setConfirmDelete(null);}}} style={{padding:"8px 4px",borderRight:`1px solid ${C.border}22`,background:isToday?C.accent+"0a":isAdding?C.accent+"15":"transparent",cursor:"pointer",textAlign:"center",minHeight:70,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"space-between",transition:"background .1s"}}
-                      onMouseEnter={e=>e.currentTarget.style.background=isToday?C.accent+"18":C.accent+"0d"}
-                      onMouseLeave={e=>e.currentTarget.style.background=isToday?C.accent+"0a":isAdding?C.accent+"15":"transparent"}>
-                      <div>
-                        <div style={{fontFamily:font,fontSize:10,fontWeight:600,color:isToday?C.accent:C.muted}}>{d.label}</div>
-                        <div style={{fontFamily:font,fontSize:14,fontWeight:700,color:isToday?C.accent:C.text}}>{d.num}</div>
-                      </div>
-                      {s?<div style={{background:col+"22",border:`2px solid ${col}`,borderRadius:8,padding:"4px 6px",width:"90%"}}>
-                        <div style={{fontFamily:font,fontSize:11,fontWeight:700,color:col}}>{s.start}</div>
-                        <div style={{fontFamily:font,fontSize:10,color:col+"aa"}}>→ {s.end}</div>
-                      </div>:<div style={{fontFamily:font,fontSize:20,color:C.dim,opacity:.3}}>+</div>}
-                    </div>);
-                  })}
+        // ── WEEK VIEW ──
+        if(scheduleView==="week"){
+          const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),full:DAYS[i],num:d.getDate(),month:MONTHS[d.getMonth()]});}
+          const shiftWeek=(dir)=>{const d=new Date(calWeekStart);d.setDate(d.getDate()+(dir*7));setCalWeekStart(dateKey(d));};
+          return(<div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <button onClick={()=>shiftWeek(-1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>←</button>
+              <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:14,fontWeight:700}}>{weekDays[0].num} {weekDays[0].month} — {weekDays[6].num} {weekDays[6].month}</div>
+              <button onClick={()=>shiftWeek(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>→</button>
+              <button onClick={()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));setCalWeekStart(dateKey(n));}} style={{...ss.btn(C.cardLight,C.accent),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>Hoy</button>
+              <button onClick={()=>setScheduleView("month")} style={{...ss.btn(C.cardLight,C.muted),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>📆 Mes</button>
+            </div>
+            {activeEmps.map(emp=>{
+              const col=getAvatarColor(emp.id);
+              return(<div key={emp.id} style={{...ss.card,padding:0,overflow:"hidden"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:`1px solid ${C.border}`,background:C.cardLight}}>
+                  <div style={ss.avatar(col,32)}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
+                  <div style={{flex:1}}><div style={{fontFamily:font,fontSize:14,fontWeight:700}}>{emp.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>{emp.position||"—"}</div></div>
                 </div>
-              </div>
-            </div>);
-          })}
-        </div>);
-      })()}
-
-            {/* HORARIOS — calendario mensual interactivo */}
-      {adminTab==="monthly"&&(()=>{
+                <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(56px,1fr))",minWidth:392}}>
+                    {weekDays.map(d=>{
+                      const dayScheds=(schedules[emp.id+"_"+d.date]||[]);
+                      const shifts=Array.isArray(dayScheds)?dayScheds:dayScheds.start?[dayScheds]:[];
+                      const isToday=d.date===dateKey();
+                      return(<div key={d.date} style={{padding:"6px 3px",borderRight:`1px solid ${C.border}22`,background:isToday?C.accent+"0a":"transparent",minHeight:76,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                        <div style={{textAlign:"center",marginBottom:2}}>
+                          <div style={{fontFamily:font,fontSize:10,fontWeight:600,color:isToday?C.accent:C.muted}}>{d.label}</div>
+                          <div style={{fontFamily:font,fontSize:13,fontWeight:700,color:isToday?C.accent:C.text}}>{d.num}</div>
+                        </div>
+                        {shifts.map((s,si)=><div key={si} onClick={()=>setConfirmDelete({empId:emp.id,dayKey:d.date,shiftIdx:si})} style={{background:col+"22",border:`2px solid ${col}`,borderRadius:6,padding:"3px 4px",width:"94%",cursor:"pointer",textAlign:"center"}}>
+                          <div style={{fontFamily:font,fontSize:10,fontWeight:700,color:col}}>{s.start}</div>
+                          <div style={{fontFamily:font,fontSize:9,color:col+"aa"}}>→{s.end}</div>
+                        </div>)}
+                        <div onClick={()=>{setAddShift({empId:emp.id,dayKey:d.date});setShiftForm({start:"09:00",end:"17:00"});setConfirmDelete(null);}} style={{width:"94%",height:24,border:`1.5px dashed ${C.dim}`,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:C.dim,fontSize:16,opacity:.5}} onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=.5}>+</div>
+                      </div>);
+                    })}
+                  </div>
+                </div>
+              </div>);
+            })}
+          </div>);
+        }
+        // ── MONTH VIEW ──
         const year=Math.floor(calMonthView/100);const month=calMonthView%100;
         const daysInMonth=new Date(year,month+1,0).getDate();
-        const activeEmps=employees.filter(e=>e.active);
         const prevMonth=()=>{const m=month===0?11:month-1;const y=month===0?year-1:year;setCalMonthView(y*100+m);};
         const nextMonth=()=>{const m=month===11?0:month+1;const y=month===11?year+1:year;setCalMonthView(y*100+m);};
         const MONTH_NAMES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -509,176 +504,210 @@ export default function App(){
         const dow=(d)=>new Date(year,month,d).getDay();
         const isWeekend=(d)=>{const w=dow(d);return w===0||w===6;};
         const DAY_LABELS=["D","L","M","X","J","V","S"];
-
+        const cellW=38,nameW=110,totalW=nameW+daysInMonth*cellW;
         const copyEmpLastMonth=async(emp)=>{
           const pm=month===0?11:month-1;const py=month===0?year-1:year;
           const pdim=new Date(py,pm+1,0).getDate();
           const newScheds={...schedules};let count=0;
           for(let d=1;d<=Math.min(pdim,daysInMonth);d++){
             const pdk=`${py}-${String(pm+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-            const s=schedules[emp.id+"_"+pdk];
-            if(s){const cdk=dk(d);await DB.setSchedule(emp.id,cdk,s.start,s.end);newScheds[emp.id+"_"+cdk]={empId:emp.id,start:s.start,end:s.end};count++;}
+            const ps=schedules[emp.id+"_"+pdk];
+            if(ps){const shifts=Array.isArray(ps)?ps:ps.start?[ps]:[];if(shifts.length){const cdk=dk(d);await DB.setSchedule(emp.id,cdk,shifts[0].start,shifts[0].end);newScheds[emp.id+"_"+cdk]=shifts[0];count++;}}
           }
           setSchedules(newScheds);flash(`${emp.name.split(" ")[0]}: ${count} turnos copiados ✓`);
         };
-
-        const handleCellClick=(emp,d)=>{
-          const key=emp.id+"_"+dk(d);
-          const existing=schedules[key];
-          if(existing){
-            setConfirmDelete({empId:emp.id,dayKey:dk(d)});
-          } else {
-            setAddShift({empId:emp.id,dayKey:dk(d)});
-            setShiftForm({start:"09:00",end:"17:00"});
-            setConfirmDelete(null);
-          }
-        };
-
-        // Responsive: on desktop use bigger cells
-        const cellW = 38;
-        const nameW = 110;
-        const totalW = nameW + daysInMonth * cellW;
-
         return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
-          {/* Header nav */}
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>←</button>
-            <div style={{flex:1,textAlign:"center",fontSize:18,fontWeight:700,fontFamily:font}}>{MONTH_NAMES[month]} {year}</div>
-            <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>→</button>
+            <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>←</button>
+            <div style={{flex:1,textAlign:"center",fontSize:16,fontWeight:700,fontFamily:font}}>{MONTH_NAMES[month]} {year}</div>
+            <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>→</button>
+            <button onClick={()=>setScheduleView("week")} style={{...ss.btn(C.cardLight,C.muted),width:"auto",border:`1px solid ${C.border}`,padding:"6px 10px",fontSize:11,flexShrink:0}}>📅 Semana</button>
           </div>
-
-          {/* Calendar grid */}
           <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",borderRadius:14,border:`1px solid ${C.border}`,boxShadow:"0 2px 8px #0001"}}>
             <div style={{minWidth:totalW}}>
-              {/* Day headers */}
-              <div style={{display:"grid",gridTemplateColumns:`${nameW}px repeat(${daysInMonth},${cellW}px)`,background:C.cardLight,borderBottom:`2px solid ${C.border}`,position:"sticky",top:0,zIndex:3}}>
+              <div style={{display:"grid",gridTemplateColumns:`${nameW}px repeat(${daysInMonth},${cellW}px)`,background:C.cardLight,borderBottom:`2px solid ${C.border}`}}>
                 <div style={{padding:"10px 12px",fontFamily:font,fontSize:11,fontWeight:600,color:C.muted,borderRight:`1px solid ${C.border}`}}>Empleado</div>
-                {days.map(d=><div key={d} style={{padding:"6px 2px",textAlign:"center",background:isToday(d)?C.accent+"22":isWeekend(d)?"#f5f5ff":"transparent",borderLeft:`1px solid ${C.border}22`}}>
+                {days.map(d=><div key={d} style={{padding:"4px 1px",textAlign:"center",background:isToday(d)?C.accent+"22":isWeekend(d)?"#f5f5ff":"transparent",borderLeft:`1px solid ${C.border}22`}}>
                   <div style={{fontFamily:font,fontSize:9,color:isToday(d)?C.accent:isWeekend(d)?C.purple:C.muted,fontWeight:600}}>{DAY_LABELS[dow(d)]}</div>
-                  <div style={{fontFamily:font,fontSize:13,fontWeight:isToday(d)?700:500,color:isToday(d)?C.accent:isWeekend(d)?C.purple:C.text}}>{d}</div>
+                  <div style={{fontFamily:font,fontSize:11,fontWeight:isToday(d)?700:500,color:isToday(d)?C.accent:C.text}}>{d}</div>
                 </div>)}
               </div>
-
-              {/* Employee rows */}
               {activeEmps.map((emp,ei)=>{
                 const col=getAvatarColor(emp.id);
-                const isAddingThisEmp=addShift?.empId===emp.id;
-                const isConfirmingThisEmp=confirmDelete?.empId===emp.id;
-                return(<React.Fragment key={emp.id}>
-                  <div style={{display:"grid",gridTemplateColumns:`${nameW}px repeat(${daysInMonth},${cellW}px)`,borderBottom:(isAddingThisEmp||isConfirmingThisEmp)?`1px solid ${C.accent}22`:`1px solid ${C.border}22`,background:ei%2===0?C.card:C.cardLight+"88"}}>
-                  {/* Name cell */}
-                  <div style={{padding:"8px 10px",display:"flex",alignItems:"center",gap:8,position:"sticky",left:0,background:ei%2===0?C.card:C.cardLight,zIndex:2,borderRight:`1px solid ${C.border}`}}>
-                    <div style={ss.avatar(col,28)}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
+                return(<div key={emp.id} style={{display:"grid",gridTemplateColumns:`${nameW}px repeat(${daysInMonth},${cellW}px)`,borderBottom:ei<activeEmps.length-1?`1px solid ${C.border}22`:"none",background:ei%2===0?C.card:C.cardLight+"88"}}>
+                  <div style={{padding:"6px 10px",display:"flex",alignItems:"center",gap:6,position:"sticky",left:0,background:ei%2===0?C.card:C.cardLight,zIndex:2,borderRight:`1px solid ${C.border}`}}>
+                    <div style={ss.avatar(col,26)}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
                     <div style={{minWidth:0}}>
-                      <div style={{fontFamily:font,fontSize:11,fontWeight:700,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
-                      <button onClick={()=>copyEmpLastMonth(emp)} style={{background:"none",border:"none",color:C.accent,cursor:"pointer",fontFamily:font,fontSize:8,padding:0,textAlign:"left"}}>📋 mes ant.</button>
-                      <button onClick={async()=>{
-                        if(!window.confirm(`¿Borrar TODOS los turnos de ${emp.name.split(" ")[0]} en ${MONTH_NAMES[month]}?`))return;
-                        const newScheds={...schedules};let count=0;
-                        for(let d=1;d<=daysInMonth;d++){const cdk=dk(d);if(newScheds[emp.id+"_"+cdk]){await DB.deleteSchedule(emp.id,cdk);delete newScheds[emp.id+"_"+cdk];count++;}}
-                        setSchedules(newScheds);flash(`${emp.name.split(" ")[0]}: ${count} turnos borrados`);
-                      }} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontFamily:font,fontSize:8,padding:0,textAlign:"left"}}>🗑 borrar mes</button>
+                      <div style={{fontFamily:font,fontSize:10,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
+                      <div style={{display:"flex",gap:4}}>
+                        <button onClick={()=>copyEmpLastMonth(emp)} style={{background:"none",border:"none",color:C.accent,cursor:"pointer",fontFamily:font,fontSize:7,padding:0}}>📋</button>
+                        <button onClick={async()=>{if(!window.confirm(`¿Borrar todos los turnos de ${emp.name.split(" ")[0]} en ${MONTH_NAMES[month]}?`))return;const ns={...schedules};let c=0;for(let d=1;d<=daysInMonth;d++){const cdk=dk(d);if(ns[emp.id+"_"+cdk]){await DB.deleteSchedule(emp.id,cdk);delete ns[emp.id+"_"+cdk];c++;}}setSchedules(ns);flash(`${emp.name.split(" ")[0]}: ${c} turnos borrados`);}} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontFamily:font,fontSize:7,padding:0}}>🗑</button>
+                      </div>
                     </div>
                   </div>
-                  {/* Day cells */}
                   {days.map(d=>{
-                    const key=emp.id+"_"+dk(d);
-                    const s=schedules[key];
+                    const raw=schedules[emp.id+"_"+dk(d)];
+                    const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                     const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=dk(d)&&v.end>=dk(d));
-                    const isAdding=addShift?.empId===emp.id&&addShift?.dayKey===dk(d);
-                    const isDeleting=confirmDelete?.empId===emp.id&&confirmDelete?.dayKey===dk(d);
-                    const bgBase=isToday(d)?C.accent+"15":isWeekend(d)?"#f5f5ff":"transparent";
-                    return(<div key={d} onClick={()=>!vac&&handleCellClick(emp,d)} style={{padding:2,borderLeft:`1px solid ${C.border}11`,background:isDeleting?C.red+"22":isAdding?C.accent+"22":bgBase,minHeight:44,display:"flex",alignItems:"center",justifyContent:"center",cursor:vac?"default":"pointer",transition:"background .1s"}}
-                      onMouseEnter={e=>{if(!vac)e.currentTarget.style.background=isAdding?C.accent+"33":C.accent+"11";}}
-                      onMouseLeave={e=>{e.currentTarget.style.background=isDeleting?C.red+"22":isAdding?C.accent+"22":bgBase;}}>
-                      {vac?<div style={{width:"92%",background:vac.status==="approved"?C.green+"44":C.accent+"33",borderRadius:4,textAlign:"center",padding:"3px 1px"}}>
-                        <div style={{fontFamily:font,fontSize:9}}>🏖</div>
-                      </div>:s?<div style={{width:"92%",background:col+"28",borderRadius:4,borderLeft:`3px solid ${col}`,padding:"2px 3px"}}>
-                        <div style={{fontFamily:font,fontSize:9,color:col,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden"}}>{s.start}</div>
-                        <div style={{fontFamily:font,fontSize:8,color:col+"bb"}}>{s.end}</div>
-                      </div>:<div style={{fontFamily:font,fontSize:16,color:C.dim,opacity:.4}}>+</div>}
+                    return(<div key={d} style={{padding:1,borderLeft:`1px solid ${C.border}11`,background:isToday(d)?C.accent+"15":isWeekend(d)?"#f5f5ff":"transparent",minHeight:36,display:"flex",flexDirection:"column",gap:1,alignItems:"center",justifyContent:"center",cursor:vac?"default":"pointer"}}
+                      onClick={()=>{if(!vac){setAddShift({empId:emp.id,dayKey:dk(d)});setShiftForm({start:"09:00",end:"17:00"});setConfirmDelete(null);}}}
+                      onMouseEnter={e=>{if(!vac)e.currentTarget.style.background=C.accent+"11";}}
+                      onMouseLeave={e=>{e.currentTarget.style.background=isToday(d)?C.accent+"15":isWeekend(d)?"#f5f5ff":"transparent";}}>
+                      {vac?<div style={{fontSize:9,textAlign:"center"}}>🏖</div>
+                      :shifts.length>0?shifts.map((s,si)=><div key={si} style={{width:"92%",background:col+"28",borderRadius:2,borderLeft:`2px solid ${col}`,padding:"1px 2px"}}>
+                        <div style={{fontFamily:font,fontSize:6,color:col,fontWeight:700,overflow:"hidden",whiteSpace:"nowrap"}}>{s.start}</div>
+                      </div>):<div style={{fontSize:12,color:C.dim,opacity:.3}}>+</div>}
                     </div>);
                   })}
-                  </div>
-                  {/* no inline form here anymore — modal below */}
-                </React.Fragment>);
+                </div>);
               })}
             </div>
           </div>
-
-          {/* Legend */}
-          <div style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"center",padding:"4px 0"}}>
-            {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:2,background:getAvatarColor(emp.id)}}/><span style={{fontFamily:font,fontSize:10,color:C.text}}>{emp.name.split(" ")[0]}</span></div>)}
-            <div style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:2,background:C.green+"44",border:`1.5px solid ${C.green}`}}/><span style={{fontFamily:font,fontSize:10,color:C.muted}}>Vacaciones</span></div>
-            <div style={{fontFamily:font,fontSize:10,color:C.dim,marginLeft:"auto"}}>Clic en celda vacía → añadir · Clic en turno → borrar</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+            {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:8,height:8,borderRadius:2,background:getAvatarColor(emp.id)}}/><span style={{fontFamily:font,fontSize:9,color:C.text}}>{emp.name.split(" ")[0]}</span></div>)}
           </div>
         </div>);
       })()}
 
-      {/* ── MODALES compartidos semana + mes ── */}
+      {/* OVERVIEW — calendario visual solo lectura, fila por empleado */}
+      {adminTab==="overview"&&(()=>{
+        const year=Math.floor(calMonthView/100);const month=calMonthView%100;
+        const daysInMonth=new Date(year,month+1,0).getDate();
+        const prevMonth=()=>{const m=month===0?11:month-1;const y=month===0?year-1:year;setCalMonthView(y*100+m);};
+        const nextMonth=()=>{const m=month===11?0:month+1;const y=month===11?year+1:year;setCalMonthView(y*100+m);};
+        const MONTH_NAMES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+        const activeEmps=employees.filter(e=>e.active);
+        const firstDow=new Date(year,month,1).getDay();
+        const startDow=firstDow===0?6:firstDow-1;
+        const cells=[];
+        for(let i=0;i<startDow;i++)cells.push(null);
+        for(let d=1;d<=daysInMonth;d++)cells.push(d);
+        const dk=(d)=>`${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+        const slotH=18; // height per employee slot in px
+        return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>←</button>
+            <div style={{flex:1,textAlign:"center",fontSize:16,fontWeight:700,fontFamily:font}}>{MONTH_NAMES[month]} {year}</div>
+            <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>→</button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>
+            {["L","M","X","J","V","S","D"].map(d=><div key={d} style={{textAlign:"center",fontFamily:font,fontSize:10,color:C.muted,padding:"4px 0",fontWeight:600}}>{d}</div>)}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}}>
+            {cells.map((day,i)=>{
+              if(!day)return<div key={i}/>;
+              const d=dk(day);
+              const today=d===dateKey();
+              const isWeekend=new Date(year,month,day).getDay()===0||new Date(year,month,day).getDay()===6;
+              return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column"}}>
+                <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
+                {activeEmps.map(emp=>{
+                  const col=getAvatarColor(emp.id);
+                  const raw=schedules[emp.id+"_"+d];
+                  const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+                  const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
+                  return(<div key={emp.id} style={{height:slotH,marginBottom:2,display:"flex",alignItems:"center"}}>
+                    {vac?<div style={{width:"100%",height:slotH-2,background:C.green+"33",borderLeft:`2px solid ${C.green}`,borderRadius:"0 3px 3px 0",display:"flex",alignItems:"center",paddingLeft:2}}>
+                      <span style={{fontFamily:font,fontSize:7,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>🏖{emp.name.split(" ")[0]}</span>
+                    </div>:shifts.length>0?<div style={{width:"100%",height:slotH-2,background:col+"22",borderLeft:`2px solid ${col}`,borderRadius:"0 3px 3px 0",display:"flex",flexDirection:"column",justifyContent:"center",paddingLeft:2}}>
+                      <span style={{fontFamily:font,fontSize:7,color:col,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
+                      <span style={{fontFamily:font,fontSize:6,color:col+"aa"}}>{shifts[0].start}{shifts.length>1?"+":""}</span>
+                    </div>:<div style={{width:"100%",height:slotH-2}}/>}
+                  </div>);
+                })}
+              </div>);
+            })}
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",padding:"4px 0"}}>
+            {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:8,height:8,borderRadius:2,background:getAvatarColor(emp.id)}}/><span style={{fontFamily:font,fontSize:9,color:C.text}}>{emp.name.split(" ")[0]}</span></div>)}
+            <div style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:8,height:8,borderRadius:2,background:C.green+"66",border:`1px solid ${C.green}`}}/><span style={{fontFamily:font,fontSize:9,color:C.muted}}>Vacaciones</span></div>
+          </div>
+        </div>);
+      })()}
+
+                  {/* VACATIONS */}
+      {/* ── MODAL añadir/partir turno ── */}
       {addShift&&(()=>{
         const emp=employees.find(e=>e.id===addShift.empId);
         const col=getAvatarColor(addShift.empId);
-        const fmtDay=(dk)=>{const d=new Date(dk);return d.toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});};
-        const monthOfShift=new Date(addShift.dayKey).getMonth();
-        const yearOfShift=new Date(addShift.dayKey).getFullYear();
-        const daysInShiftMonth=new Date(yearOfShift,monthOfShift+1,0).getDate();
-        const dkMonth=(d)=>`${yearOfShift}-${String(monthOfShift+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+        const fmtDay=(d)=>new Date(d).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
+        const existing=schedules[addShift.empId+"_"+addShift.dayKey];
+        const existingShifts=Array.isArray(existing)?existing:existing?.start?[existing]:[];
+        const isSplit=existingShifts.length>0;
         return(<div onClick={e=>{if(e.target===e.currentTarget)setAddShift(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(3px)"}}>
-          <div style={{background:C.card,borderRadius:24,padding:0,width:"100%",maxWidth:420,boxShadow:"0 24px 60px rgba(0,0,0,.25)",overflow:"hidden",animation:"popIn .2s"}}>
-            <div style={{background:`linear-gradient(135deg,${col},${col}cc)`,padding:"24px 24px 20px",position:"relative"}}>
-              <button onClick={()=>setAddShift(null)} style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,.2)",border:"none",borderRadius:"50%",width:32,height:32,color:"#fff",cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          <div style={{background:C.card,borderRadius:24,width:"100%",maxWidth:420,boxShadow:"0 24px 60px rgba(0,0,0,.25)",overflow:"hidden",animation:"popIn .2s"}}>
+            <div style={{background:`linear-gradient(135deg,${col},${col}cc)`,padding:"20px 24px",position:"relative"}}>
+              <button onClick={()=>setAddShift(null)} style={{position:"absolute",top:14,right:14,background:"rgba(255,255,255,.2)",border:"none",borderRadius:"50%",width:30,height:30,color:"#fff",cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:48,height:48,borderRadius:"50%",background:"rgba(255,255,255,.25)",border:"2px solid rgba(255,255,255,.5)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:18,fontWeight:700,color:"#fff"}}>{emp?.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
+                <div style={{width:44,height:44,borderRadius:"50%",background:"rgba(255,255,255,.25)",border:"2px solid rgba(255,255,255,.5)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:16,fontWeight:700,color:"#fff"}}>{emp?.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
                 <div>
-                  <div style={{fontFamily:font,fontSize:18,fontWeight:700,color:"#fff"}}>{emp?.name.split(" ")[0]}</div>
-                  <div style={{fontFamily:font,fontSize:12,color:"rgba(255,255,255,.8)",textTransform:"capitalize"}}>{fmtDay(addShift.dayKey)}</div>
+                  <div style={{fontFamily:font,fontSize:16,fontWeight:700,color:"#fff"}}>{emp?.name.split(" ")[0]}</div>
+                  <div style={{fontFamily:font,fontSize:11,color:"rgba(255,255,255,.8)",textTransform:"capitalize"}}>{fmtDay(addShift.dayKey)}</div>
                 </div>
               </div>
+              {isSplit&&<div style={{marginTop:10,background:"rgba(255,255,255,.15)",borderRadius:8,padding:"6px 10px",fontFamily:font,fontSize:11,color:"#fff"}}>
+                Turnos actuales: {existingShifts.map((s,i)=><span key={i} style={{fontWeight:700}}>{s.start}–{s.end}{i<existingShifts.length-1?" · ":""}</span>)}
+              </div>}
             </div>
-            <div style={{padding:"24px"}}>
-              <div style={{display:"flex",gap:12,marginBottom:20}}>
+            <div style={{padding:"20px"}}>
+              <div style={{fontFamily:font,fontSize:11,fontWeight:600,color:C.muted,marginBottom:10,letterSpacing:1}}>{isSplit?"AÑADIR TURNO PARTIDO":"HORARIO"}</div>
+              <div style={{display:"flex",gap:12,marginBottom:16}}>
                 <div style={{flex:1}}>
-                  <div style={{fontFamily:font,fontSize:11,fontWeight:600,color:C.muted,letterSpacing:1,marginBottom:6}}>ENTRADA</div>
-                  <input type="time" value={shiftForm.start} onChange={e=>setShiftForm({...shiftForm,start:e.target.value})} style={{...ss.input,fontSize:20,fontWeight:700,textAlign:"center",padding:"12px",color:C.accent,border:`2px solid ${C.accent}33`,borderRadius:12}}/>
+                  <div style={{fontFamily:font,fontSize:10,color:C.muted,marginBottom:4}}>ENTRADA</div>
+                  <input type="time" value={shiftForm.start} onChange={e=>setShiftForm({...shiftForm,start:e.target.value})} style={{...ss.input,fontSize:18,fontWeight:700,textAlign:"center",padding:"10px",color:C.accent,border:`2px solid ${C.accent}33`,borderRadius:12}}/>
                 </div>
-                <div style={{display:"flex",alignItems:"center",paddingTop:24,color:C.dim,fontSize:20}}>→</div>
+                <div style={{display:"flex",alignItems:"center",paddingTop:20,color:C.dim,fontSize:18}}>→</div>
                 <div style={{flex:1}}>
-                  <div style={{fontFamily:font,fontSize:11,fontWeight:600,color:C.muted,letterSpacing:1,marginBottom:6}}>SALIDA</div>
-                  <input type="time" value={shiftForm.end} onChange={e=>setShiftForm({...shiftForm,end:e.target.value})} style={{...ss.input,fontSize:20,fontWeight:700,textAlign:"center",padding:"12px",color:C.accent,border:`2px solid ${C.accent}33`,borderRadius:12}}/>
+                  <div style={{fontFamily:font,fontSize:10,color:C.muted,marginBottom:4}}>SALIDA</div>
+                  <input type="time" value={shiftForm.end} onChange={e=>setShiftForm({...shiftForm,end:e.target.value})} style={{...ss.input,fontSize:18,fontWeight:700,textAlign:"center",padding:"10px",color:C.accent,border:`2px solid ${C.accent}33`,borderRadius:12}}/>
                 </div>
               </div>
-              <button onClick={async()=>{await DB.setSchedule(addShift.empId,addShift.dayKey,shiftForm.start,shiftForm.end);setSchedules({...schedules,[addShift.empId+"_"+addShift.dayKey]:{empId:addShift.empId,start:shiftForm.start,end:shiftForm.end}});setAddShift(null);flash("Turno guardado ✓");}} style={{...ss.btn(col,"#fff"),borderRadius:14,marginBottom:10,fontSize:15,fontWeight:700,padding:"14px"}}>✓ Guardar solo este día</button>
+              <button onClick={async()=>{
+                const newShift={start:shiftForm.start,end:shiftForm.end};
+                const allShifts=[...existingShifts,newShift].sort((a,b)=>a.start.localeCompare(b.start));
+                await DB.setSchedule(addShift.empId,addShift.dayKey,allShifts[0].start,allShifts[0].end);
+                setSchedules({...schedules,[addShift.empId+"_"+addShift.dayKey]:allShifts.length===1?allShifts[0]:allShifts});
+                setAddShift(null);flash(isSplit?"Turno partido añadido ✓":"Turno guardado ✓");
+              }} style={{...ss.btn(col,"#fff"),borderRadius:12,marginBottom:8,fontSize:14,fontWeight:700,padding:"13px"}}>{isSplit?"+ Añadir turno partido":"✓ Guardar este día"}</button>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                <button onClick={async()=>{const newScheds={...schedules};const cd=new Date(addShift.dayKey);const dw=cd.getDay()||7;const mon=new Date(cd);mon.setDate(cd.getDate()-(dw-1));for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const cdk=dateKey(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}setSchedules(newScheds);setAddShift(null);flash("Semana aplicada ✓");}} style={{...ss.btn(C.cardLight,C.green),border:`1.5px solid ${C.green}44`,borderRadius:12,padding:"11px",fontSize:13}}>📅 Esta semana</button>
-                <button onClick={async()=>{const newScheds={...schedules};for(let d=1;d<=daysInShiftMonth;d++){const cdk=dkMonth(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);newScheds[addShift.empId+"_"+cdk]={empId:addShift.empId,start:shiftForm.start,end:shiftForm.end};}setSchedules(newScheds);setAddShift(null);flash("Mes aplicado ✓");}} style={{...ss.btn(C.cardLight,C.blue),border:`1.5px solid ${C.blue}44`,borderRadius:12,padding:"11px",fontSize:13}}>📆 Todo el mes</button>
+                <button onClick={async()=>{const ns={...schedules};const cd=new Date(addShift.dayKey);const dw=cd.getDay()||7;const mon=new Date(cd);mon.setDate(cd.getDate()-(dw-1));for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const cdk=dateKey(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);ns[addShift.empId+"_"+cdk]={start:shiftForm.start,end:shiftForm.end};}setSchedules(ns);setAddShift(null);flash("Semana aplicada ✓");}} style={{...ss.btn(C.cardLight,C.green),border:`1.5px solid ${C.green}44`,borderRadius:10,padding:"10px",fontSize:12}}>📅 Esta semana</button>
+                <button onClick={async()=>{const ns={...schedules};const y=new Date(addShift.dayKey).getFullYear();const m=new Date(addShift.dayKey).getMonth();const dim=new Date(y,m+1,0).getDate();for(let d=1;d<=dim;d++){const cdk=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);ns[addShift.empId+"_"+cdk]={start:shiftForm.start,end:shiftForm.end};}setSchedules(ns);setAddShift(null);flash("Mes aplicado ✓");}} style={{...ss.btn(C.cardLight,C.blue),border:`1.5px solid ${C.blue}44`,borderRadius:10,padding:"10px",fontSize:12}}>📆 Todo el mes</button>
               </div>
             </div>
           </div>
         </div>);
       })()}
 
+      {/* ── MODAL borrar turno ── */}
       {confirmDelete&&(()=>{
         const emp=employees.find(e=>e.id===confirmDelete.empId);
         const col=getAvatarColor(confirmDelete.empId);
-        const s=schedules[confirmDelete.empId+"_"+confirmDelete.dayKey];
+        const existing=schedules[confirmDelete.empId+"_"+confirmDelete.dayKey];
+        const shifts=Array.isArray(existing)?existing:existing?.start?[existing]:[];
+        const idx=confirmDelete.shiftIdx??0;
+        const s=shifts[idx];
         return(<div onClick={e=>{if(e.target===e.currentTarget)setConfirmDelete(null);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(3px)"}}>
           <div style={{background:C.card,borderRadius:24,width:"100%",maxWidth:360,boxShadow:"0 24px 60px rgba(0,0,0,.25)",overflow:"hidden",animation:"popIn .2s"}}>
-            <div style={{background:`linear-gradient(135deg,${C.red},#ff6b6b)`,padding:"24px",textAlign:"center"}}>
-              <div style={{fontSize:32,marginBottom:8}}>🗑</div>
-              <div style={{fontFamily:font,fontSize:16,fontWeight:700,color:"#fff"}}>¿Borrar turno?</div>
-              <div style={{fontFamily:font,fontSize:13,color:"rgba(255,255,255,.8)",marginTop:4}}>{emp?.name.split(" ")[0]} · {confirmDelete.dayKey}</div>
-              {s&&<div style={{fontFamily:font,fontSize:20,fontWeight:700,color:"#fff",marginTop:8}}>{s.start} → {s.end}</div>}
+            <div style={{background:`linear-gradient(135deg,${C.red},#ff6b6b)`,padding:"20px",textAlign:"center"}}>
+              <div style={{fontSize:28,marginBottom:6}}>🗑</div>
+              <div style={{fontFamily:font,fontSize:15,fontWeight:700,color:"#fff"}}>¿Borrar turno?</div>
+              <div style={{fontFamily:font,fontSize:12,color:"rgba(255,255,255,.8)",marginTop:3}}>{emp?.name.split(" ")[0]} · {confirmDelete.dayKey}</div>
+              {s&&<div style={{fontFamily:font,fontSize:18,fontWeight:700,color:"#fff",marginTop:6}}>{s.start} → {s.end}</div>}
+              {shifts.length>1&&<div style={{fontFamily:font,fontSize:10,color:"rgba(255,255,255,.7)",marginTop:4}}>({shifts.length} turnos este día)</div>}
             </div>
-            <div style={{padding:"20px",display:"flex",gap:10}}>
-              <button onClick={()=>setConfirmDelete(null)} style={{...ss.btn(C.cardLight,C.muted),flex:1,border:`1px solid ${C.border}`,borderRadius:12}}>Cancelar</button>
-              <button onClick={async()=>{const key=confirmDelete.empId+"_"+confirmDelete.dayKey;await DB.deleteSchedule(confirmDelete.empId,confirmDelete.dayKey);const ns={...schedules};delete ns[key];setSchedules(ns);setConfirmDelete(null);flash("Turno borrado");}} style={{...ss.btn(C.red,"#fff"),flex:1,borderRadius:12}}>Borrar</button>
+            <div style={{padding:"16px",display:"flex",gap:8}}>
+              <button onClick={()=>setConfirmDelete(null)} style={{...ss.btn(C.cardLight,C.muted),flex:1,border:`1px solid ${C.border}`,borderRadius:10}}>Cancelar</button>
+              <button onClick={async()=>{
+                const key=confirmDelete.empId+"_"+confirmDelete.dayKey;
+                const remaining=shifts.filter((_,i)=>i!==idx);
+                if(remaining.length===0){await DB.deleteSchedule(confirmDelete.empId,confirmDelete.dayKey);const ns={...schedules};delete ns[key];setSchedules(ns);}
+                else{await DB.setSchedule(confirmDelete.empId,confirmDelete.dayKey,remaining[0].start,remaining[0].end);setSchedules({...schedules,[key]:remaining.length===1?remaining[0]:remaining});}
+                setConfirmDelete(null);flash("Turno borrado");
+              }} style={{...ss.btn(C.red,"#fff"),flex:1,borderRadius:10}}>Borrar</button>
             </div>
           </div>
         </div>);
       })()}
-
-            {/* VACATIONS */}
       {adminTab==="vacations"&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
         {vacations.sort((a,b)=>b.id-a.id).map(v=>{const emp=employees.find(e=>e.id===v.empId);const cc={pending:{bg:"#fefce8",c:C.accent},approved:{bg:"#f0fdf4",c:C.green},rejected:{bg:"#fef2f2",c:C.red}}[v.status];return(<div key={v.id} style={{...ss.card,display:"flex",flexDirection:"column",gap:8}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:600}}>{emp?.name?.split(" ")[0]}</span><span style={{fontFamily:font,fontSize:12}}>{fmtDate(v.start)} → {fmtDate(v.end)}</span><span style={{marginLeft:"auto",fontFamily:font,fontSize:9,fontWeight:700,padding:"3px 8px",borderRadius:6,background:cc.bg,color:cc.c}}>{v.status==="pending"?"PENDIENTE":v.status==="approved"?"APROBADA":"RECHAZADA"}</span></div>
