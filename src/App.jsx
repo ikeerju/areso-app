@@ -620,13 +620,13 @@ export default function App(){
                   const raw=schedules[emp.id+"_"+d];
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
-                  return(<div key={emp.id} style={{height:34,marginBottom:2,flexShrink:0}}>
-                    {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"2px 5px",display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:10}}>🏖</span>
-                      <span style={{fontFamily:font,fontSize:9,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
-                    </div>:shifts.length>0?<div style={{height:"100%",background:col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"2px 5px",display:"flex",flexDirection:"column",justifyContent:"center"}}>
-                      <div style={{fontFamily:font,fontSize:9,color:col,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
-                      <div style={{fontFamily:font,fontSize:8,color:col+"cc",overflow:"hidden",whiteSpace:"nowrap"}}>{shifts[0].start}–{shifts[0].end}{shifts.length>1?` +${shifts.length-1}`:""}</div>
+                  return(<div key={emp.id} style={{height:40,marginBottom:2,flexShrink:0}}>
+                    {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{fontSize:11}}>🏖</span>
+                      <span style={{fontFamily:font,fontSize:10,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
+                    </div>:shifts.length>0?<div style={{height:"100%",background:col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",flexDirection:"column",justifyContent:"center"}}>
+                      <div style={{fontFamily:font,fontSize:10,color:col,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
+                      <div style={{fontFamily:font,fontSize:9,color:col+"dd",overflow:"hidden",whiteSpace:"nowrap"}}>{shifts[0].start}–{shifts[0].end}{shifts.length>1?` +${shifts.length-1}`:""}</div>
                     </div>:<div style={{height:"100%"}}/>}
                   </div>);
                 })}
