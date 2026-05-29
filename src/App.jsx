@@ -822,13 +822,14 @@ export default function App(){
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
                   const isMe=emp.id===user.id;
-                  return(<div key={emp.id} style={{height:40,marginBottom:2,flexShrink:0}}>
+                  const cellH=vac?40:shifts.length>1?40+(shifts.length-1)*16:40;
+                  return(<div key={emp.id} style={{height:cellH,marginBottom:2,flexShrink:0}}>
                     {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{fontSize:11}}>🏖</span>
                       <span style={{fontFamily:font,fontSize:10,color:C.green,fontWeight:700}}>{emp.name.split(" ")[0]}</span>
                     </div>:shifts.length>0?<div style={{height:"100%",background:isMe?col+"44":col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",flexDirection:"column",justifyContent:"center",boxShadow:isMe?`0 0 0 1px ${col}`:undefined}}>
                       <div style={{fontFamily:font,fontSize:10,color:col,fontWeight:isMe?800:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}{isMe?" (yo)":""}</div>
-                      <div style={{fontFamily:font,fontSize:9,color:col+"dd",overflow:"hidden",whiteSpace:"nowrap"}}>{shifts.map(s=>`${s.start}–${s.end}`).join(" / ")}</div>
+                      {shifts.map((s,si)=><div key={si} style={{fontFamily:font,fontSize:9,color:col+"dd",overflow:"hidden",whiteSpace:"nowrap"}}>{s.start}–{s.end}</div>)}
                     </div>:<div style={{height:"100%"}}/>}
                   </div>);
                 })}
