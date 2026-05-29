@@ -133,10 +133,11 @@ function HorariosEmpleado({schedules,user,calWeekStart2,setCalWeekStart2,goHome}
             <div style={{fontFamily:font,fontSize:11,color:C.muted}}>{d.num} {MONTHS[new Date(d.date).getMonth()]}</div>
           </div>
           {shifts.length>0?<div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}>
-            {shifts.map((s,si)=><div key={si} style={{background:col+"18",border:`2px solid ${col}`,borderRadius:12,padding:"10px 18px",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
-              <span style={{fontFamily:font,fontSize:16,fontWeight:700,color:col}}>{s.start}</span>
-              <span style={{color:C.dim,fontSize:18}}>→</span>
-              <span style={{fontFamily:font,fontSize:16,fontWeight:700,color:col}}>{s.end}</span>
+            {shifts.map((s,si)=><div key={si} style={{background:col+"18",border:`2px solid ${col}`,borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              <span style={{fontFamily:font,fontSize:15,fontWeight:700,color:col}}>{s.start}</span>
+              <span style={{color:C.dim,fontSize:16}}>→</span>
+              <span style={{fontFamily:font,fontSize:15,fontWeight:700,color:col}}>{s.end}</span>
+              {shifts.length>1&&<span style={{fontFamily:font,fontSize:9,color:col,background:col+"22",borderRadius:4,padding:"1px 5px"}}>T{si+1}</span>}
             </div>)}
           </div>:<div style={{flex:1,fontFamily:font,fontSize:13,color:C.dim,textAlign:"center"}}>Libre</div>}
           {isToday&&<div style={{fontFamily:font,fontSize:9,color:C.accent,fontWeight:700,background:C.accent+"18",padding:"3px 8px",borderRadius:6}}>HOY</div>}
