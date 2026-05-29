@@ -124,19 +124,20 @@ function HorariosEmpleado({schedules,user,calWeekStart2,setCalWeekStart2,goHome}
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
       {weekDays.map(d=>{
-        const s=schedules[user.id+"_"+d.date];
+        const raw=schedules[user.id+"_"+d.date];
+        const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
         const isToday=d.date===dateKey();
         return(<div key={d.date} style={{background:C.card,borderRadius:14,padding:"14px 18px",border:`1px solid ${isToday?C.accent+"55":C.border}`,display:"flex",alignItems:"center",gap:14,background:isToday?C.accent+"0d":C.card}}>
           <div style={{minWidth:80}}>
             <div style={{fontFamily:font,fontSize:13,fontWeight:700,color:isToday?C.accent:C.text}}>{d.full}</div>
             <div style={{fontFamily:font,fontSize:11,color:C.muted}}>{d.num} {MONTHS[new Date(d.date).getMonth()]}</div>
           </div>
-          {s?<div style={{flex:1,display:"flex",alignItems:"center",gap:10}}>
-            <div style={{background:col+"18",border:`2px solid ${col}`,borderRadius:12,padding:"10px 18px",flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
+          {shifts.length>0?<div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}>
+            {shifts.map((s,si)=><div key={si} style={{background:col+"18",border:`2px solid ${col}`,borderRadius:12,padding:"10px 18px",display:"flex",alignItems:"center",justifyContent:"center",gap:10}}>
               <span style={{fontFamily:font,fontSize:16,fontWeight:700,color:col}}>{s.start}</span>
               <span style={{color:C.dim,fontSize:18}}>→</span>
               <span style={{fontFamily:font,fontSize:16,fontWeight:700,color:col}}>{s.end}</span>
-            </div>
+            </div>)}
           </div>:<div style={{flex:1,fontFamily:font,fontSize:13,color:C.dim,textAlign:"center"}}>Libre</div>}
           {isToday&&<div style={{fontFamily:font,fontSize:9,color:C.accent,fontWeight:700,background:C.accent+"18",padding:"3px 8px",borderRadius:6}}>HOY</div>}
         </div>);
@@ -594,7 +595,7 @@ export default function App(){
             {["L","M","X","J","V","S","D"].map(d=><div key={d} style={{textAlign:"center",fontFamily:font,fontSize:10,color:C.muted,padding:"4px 0",fontWeight:600}}>{d}</div>)}
           </div>
           <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",marginLeft:-4,marginRight:-4,paddingLeft:4,paddingRight:4}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(120px,1fr))",gap:3,minWidth:840}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(80px,1fr))",gap:3,minWidth:560}}>
             {cells.map((day,i)=>{
               if(!day)return<div key={i}/>;
               const d=dk(day);
@@ -796,7 +797,7 @@ export default function App(){
           {["L","M","X","J","V","S","D"].map(d=><div key={d} style={{textAlign:"center",fontFamily:font,fontSize:10,color:C.muted,padding:"3px 0",fontWeight:600}}>{d}</div>)}
         </div>
         <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(120px,1fr))",gap:3,minWidth:840}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(80px,1fr))",gap:3,minWidth:560}}>
             {cells.map((day,i)=>{
               if(!day)return<div key={i}/>;
               const d=dk(day);
