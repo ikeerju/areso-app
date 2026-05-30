@@ -730,6 +730,39 @@ export default function App(){
         </div>);
       })()}
       {adminTab==="vacations"&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {/* Añadir vacaciones manualmente */}
+        <div style={{...ss.card,display:"flex",flexDirection:"column",gap:10}}>
+          <div style={ss.label}>Añadir vacaciones</div>
+          <select id="vac-emp-sel" style={ss.input}>
+            <option value="">Seleccionar empleado...</option>
+            {employees.filter(e=>e.active).map(emp=><option key={emp.id} value={emp.id}>{emp.name}</option>)}
+          </select>
+          <div style={{display:"flex",gap:8}}>
+            <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:4}}>Desde</div><input type="date" id="vac-start" style={ss.input}/></div>
+            <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:4}}>Hasta</div><input type="date" id="vac-end" style={ss.input}/></div>
+          </div>
+          <select id="vac-status" style={ss.input}>
+            <option value="approved">Aprobada</option>
+            <option value="pending">Pendiente</option>
+          </select>
+          <button onClick={async()=>{
+            const empId=document.getElementById("vac-emp-sel").value;
+            const start=document.getElementById("vac-start").value;
+            const end=document.getElementById("vac-end").value;
+            const status=document.getElementById("vac-status").value;
+            if(!empId||!start||!end)return flash("Rellena todos los campos",false);
+            await DB.addVacation({empId,start,end,notes:"Añadido por admin"});
+            if(status==="approved"){
+              const {data}=await sb.from('areso_vacations').select('id').eq('employee_id',empId).eq('start_date',start).order('id',{ascending:false}).limit(1);
+              if(data?.[0])await DB.updateVacation(data[0].id,"approved");
+            }
+            document.getElementById("vac-emp-sel").value="";
+            document.getElementById("vac-start").value="";
+            document.getElementById("vac-end").value="";
+            flash("Vacaciones añadidas ✓");
+            loadData();
+          }} style={ss.btn(C.accent,"#fff")}>+ Añadir vacaciones</button>
+        </div>
         {vacations.sort((a,b)=>b.id-a.id).map(v=>{const emp=employees.find(e=>e.id===v.empId);const cc={pending:{bg:"#fefce8",c:C.accent},approved:{bg:"#f0fdf4",c:C.green},rejected:{bg:"#fef2f2",c:C.red}}[v.status];return(<div key={v.id} style={{...ss.card,display:"flex",flexDirection:"column",gap:8}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:600}}>{emp?.name?.split(" ")[0]}</span><span style={{fontFamily:font,fontSize:12}}>{fmtDate(v.start)} → {fmtDate(v.end)}</span><span style={{marginLeft:"auto",fontFamily:font,fontSize:9,fontWeight:700,padding:"3px 8px",borderRadius:6,background:cc.bg,color:cc.c}}>{v.status==="pending"?"PENDIENTE":v.status==="approved"?"APROBADA":"RECHAZADA"}</span></div>
           {v.status==="pending"&&<div style={{display:"flex",gap:6}}><button onClick={async()=>{await DB.updateVacation(v.id,"approved");setVacations(vacations.map(x=>x.id===v.id?{...x,status:"approved"}:x));flash("Aprobada");}} style={{...ss.btn(C.green,"#000"),padding:"8px",fontSize:12}}>✓</button><button onClick={async()=>{await DB.updateVacation(v.id,"rejected");setVacations(vacations.map(x=>x.id===v.id?{...x,status:"rejected"}:x));flash("Rechazada");}} style={{...ss.btn(C.red,"#000"),padding:"8px",fontSize:12}}>✕</button></div>}
