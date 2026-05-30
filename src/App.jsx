@@ -147,6 +147,135 @@ function HorariosEmpleado({schedules,user,calWeekStart2,setCalWeekStart2,goHome}
   </div>);
 }
 
+function CalendarioEquipo({schedules,vacations,employees,calMonthView,setCalMonthView,highlightUser=null,goHome=null}){
+  const year=Math.floor(calMonthView/100);const month=calMonthView%100;
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const prevMonth=()=>{const m=month===0?11:month-1;const y=month===0?year-1:year;setCalMonthView(y*100+m);};
+  const nextMonth=()=>{const m=month===11?0:month+1;const y=month===11?year+1:year;setCalMonthView(y*100+m);};
+  const MONTH_NAMES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const activeEmps=employees.filter(e=>e.active);
+  const firstDow=new Date(year,month,1).getDay();
+  const startDow=firstDow===0?6:firstDow-1;
+  const cells=[];
+  for(let i=0;i<startDow;i++)cells.push(null);
+  for(let d=1;d<=daysInMonth;d++)cells.push(d);
+  const dk=(d)=>`${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
+    {goHome&&<button onClick={goHome} style={ss.back}>← Menú</button>}
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>←</button>
+      <div style={{flex:1,textAlign:"center",fontSize:16,fontWeight:700,fontFamily:font}}>{MONTH_NAMES[month]} {year}</div>
+      <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>→</button>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:2}}>
+      {["L","M","X","J","V","S","D"].map(d=><div key={d} style={{textAlign:"center",fontFamily:font,fontSize:10,color:C.muted,padding:"4px 0",fontWeight:600}}>{d}</div>)}
+    </div>
+    <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(80px,1fr))",gap:3,minWidth:560}}>
+      {cells.map((day,i)=>{
+        if(!day)return<div key={i}/>;
+        const d=dk(day);
+        const today=d===dateKey();
+        const isWeekend=new Date(year,month,day).getDay()===0||new Date(year,month,day).getDay()===6;
+        const weekIdx=Math.floor(i/7);
+        const weekDaysInRow=cells.slice(weekIdx*7,weekIdx*7+7).filter(x=>x);
+        const empsThisWeek=activeEmps.filter(emp=>weekDaysInRow.some(wd=>{
+          const wdk=dk(wd);
+          const raw=schedules[emp.id+"_"+wdk];
+          const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+          const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=wdk&&v.end>=wdk);
+          return shifts.length>0||!!vac;
+        }));
+        return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column",gap:1}}>
+          <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
+          {empsThisWeek.map(emp=>{
+            const col=getAvatarColor(emp.id);
+            const raw=schedules[emp.id+"_"+d];
+            const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+            const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
+            const isMe=highlightUser&&emp.id===highlightUser;
+            const emptyH=38;
+            if(!vac&&shifts.length===0)return(<div key={emp.id} style={{height:emptyH,marginBottom:2}}/>);
+            return(<div key={emp.id} style={{marginBottom:2,background:isMe?col+"44":col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"4px 6px",boxShadow:isMe?`0 0 0 1.5px ${col}`:undefined}}>
+              <div style={{fontFamily:font,fontSize:10,color:col,fontWeight:isMe?800:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}{isMe?" (yo)":""}</div>
+              {vac?<div style={{fontFamily:font,fontSize:9,color:C.green}}>🏖 Vacaciones</div>:shifts.map((s,si)=><div key={si} style={{fontFamily:font,fontSize:9,color:col+"cc",whiteSpace:"nowrap",overflow:"hidden"}}>{s.start}–{s.end}</div>)}
+            </div>);
+          })}
+        </div>);
+      })}
+    </div>
+    </div>
+    <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+      {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:8,height:8,borderRadius:2,background:getAvatarColor(emp.id)}}/><span style={{fontFamily:font,fontSize:9,color:emp.id===highlightUser?C.accent:C.text,fontWeight:emp.id===highlightUser?700:400}}>{emp.name.split(" ")[0]}{emp.id===highlightUser?" (yo)":""}</span></div>)}
+      <div style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:8,height:8,borderRadius:2,background:C.green+"66",border:`1px solid ${C.green}`}}/><span style={{fontFamily:font,fontSize:9,color:C.muted}}>Vacaciones</span></div>
+    </div>
+  </div>);
+}
+
+function CalendarioEquipo({schedules,vacations,employees,calMonthView,setCalMonthView,highlightUser=null,goHome=null}){
+  const year=Math.floor(calMonthView/100);const month=calMonthView%100;
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const prevMonth=()=>{const m=month===0?11:month-1;const y=month===0?year-1:year;setCalMonthView(y*100+m);};
+  const nextMonth=()=>{const m=month===11?0:month+1;const y=month===11?year+1:year;setCalMonthView(y*100+m);};
+  const MONTH_NAMES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const activeEmps=employees.filter(e=>e.active);
+  const firstDow=new Date(year,month,1).getDay();
+  const startDow=firstDow===0?6:firstDow-1;
+  const cells=[];
+  for(let i=0;i<startDow;i++)cells.push(null);
+  for(let d=1;d<=daysInMonth;d++)cells.push(d);
+  const dk=(d)=>`${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
+    {goHome&&<button onClick={goHome} style={ss.back}>← Menú</button>}
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>←</button>
+      <div style={{flex:1,textAlign:"center",fontSize:16,fontWeight:700,fontFamily:font}}>{MONTH_NAMES[month]} {year}</div>
+      <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>→</button>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:2}}>
+      {["L","M","X","J","V","S","D"].map(d=><div key={d} style={{textAlign:"center",fontFamily:font,fontSize:10,color:C.muted,padding:"4px 0",fontWeight:600}}>{d}</div>)}
+    </div>
+    <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(80px,1fr))",gap:3,minWidth:560}}>
+      {cells.map((day,i)=>{
+        if(!day)return<div key={i}/>;
+        const d=dk(day);
+        const today=d===dateKey();
+        const isWeekend=new Date(year,month,day).getDay()===0||new Date(year,month,day).getDay()===6;
+        const weekIdx=Math.floor(i/7);
+        const weekDaysInRow=cells.slice(weekIdx*7,weekIdx*7+7).filter(x=>x);
+        const empsThisWeek=activeEmps.filter(emp=>weekDaysInRow.some(wd=>{
+          const wdk=dk(wd);
+          const raw=schedules[emp.id+"_"+wdk];
+          const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+          const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=wdk&&v.end>=wdk);
+          return shifts.length>0||!!vac;
+        }));
+        return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column",gap:1}}>
+          <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
+          {empsThisWeek.map(emp=>{
+            const col=getAvatarColor(emp.id);
+            const raw=schedules[emp.id+"_"+d];
+            const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+            const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
+            const isMe=highlightUser&&emp.id===highlightUser;
+            if(!vac&&shifts.length===0)return(<div key={emp.id} style={{height:38,marginBottom:2}}/>);
+            return(<div key={emp.id} style={{marginBottom:2,background:isMe?col+"44":col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"4px 6px",boxShadow:isMe?`0 0 0 1.5px ${col}`:undefined}}>
+              <div style={{fontFamily:font,fontSize:10,color:col,fontWeight:isMe?800:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}{isMe?" (yo)":""}</div>
+              {vac?<div style={{fontFamily:font,fontSize:9,color:C.green}}>🏖 Vacaciones</div>:shifts.map((s,si)=><div key={si} style={{fontFamily:font,fontSize:9,color:col+"cc",whiteSpace:"nowrap",overflow:"hidden"}}>{s.start}–{s.end}</div>)}
+            </div>);
+          })}
+        </div>);
+      })}
+    </div>
+    </div>
+    <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+      {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:8,height:8,borderRadius:2,background:getAvatarColor(emp.id)}}/><span style={{fontFamily:font,fontSize:9,color:emp.id===highlightUser?C.accent:C.text,fontWeight:emp.id===highlightUser?700:400}}>{emp.name.split(" ")[0]}{emp.id===highlightUser?" (yo)":""}</span></div>)}
+      <div style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:8,height:8,borderRadius:2,background:C.green+"66",border:`1px solid ${C.green}`}}/><span style={{fontFamily:font,fontSize:9,color:C.muted}}>Vacaciones</span></div>
+    </div>
+  </div>);
+}
+
 export default function App(){
   const [employees,setEmployees]=useState([]);
   const [records,setRecords]=useState({});
@@ -593,76 +722,10 @@ export default function App(){
         </div>);
       })()}
 
-      {/* OVERVIEW — calendario visual solo lectura, fila por empleado */}
-      {adminTab==="overview"&&(()=>{
-        const year=Math.floor(calMonthView/100);const month=calMonthView%100;
-        const daysInMonth=new Date(year,month+1,0).getDate();
-        const prevMonth=()=>{const m=month===0?11:month-1;const y=month===0?year-1:year;setCalMonthView(y*100+m);};
-        const nextMonth=()=>{const m=month===11?0:month+1;const y=month===11?year+1:year;setCalMonthView(y*100+m);};
-        const MONTH_NAMES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-        const activeEmps=employees.filter(e=>e.active);
-        const firstDow=new Date(year,month,1).getDay();
-        const startDow=firstDow===0?6:firstDow-1;
-        const cells=[];
-        for(let i=0;i<startDow;i++)cells.push(null);
-        for(let d=1;d<=daysInMonth;d++)cells.push(d);
-        const dk=(d)=>`${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-        const slotH=28; // height per employee slot in px
-        return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>←</button>
-            <div style={{flex:1,textAlign:"center",fontSize:16,fontWeight:700,fontFamily:font}}>{MONTH_NAMES[month]} {year}</div>
-            <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>→</button>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>
-            {["L","M","X","J","V","S","D"].map(d=><div key={d} style={{textAlign:"center",fontFamily:font,fontSize:10,color:C.muted,padding:"4px 0",fontWeight:600}}>{d}</div>)}
-          </div>
-          <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch",marginLeft:-4,marginRight:-4,paddingLeft:4,paddingRight:4}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(80px,1fr))",gap:3,minWidth:560}}>
-            {cells.map((day,i)=>{
-              if(!day)return<div key={i}/>;
-              const d=dk(day);
-              const today=d===dateKey();
-              const isWeekend=new Date(year,month,day).getDay()===0||new Date(year,month,day).getDay()===6;
-              const weekIdx=Math.floor((i)/7);
-              const weekStart=weekIdx*7;
-              const weekDaysInRow=cells.slice(weekStart,weekStart+7).filter(x=>x);
-              const empsThisWeek=activeEmps.filter(emp=>weekDaysInRow.some(wd=>{
-                const wdk=dk(wd);
-                const raw=schedules[emp.id+"_"+wdk];
-                const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
-                const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=wdk&&v.end>=wdk);
-                return shifts.length>0||!!vac;
-              }));
-              return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column",gap:1}}>
-                <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
-                {empsThisWeek.map(emp=>{
-                  const col=getAvatarColor(emp.id);
-                  const raw=schedules[emp.id+"_"+d];
-                  const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
-                  const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
-                  return(<div key={emp.id} style={{height:42,marginBottom:2,flexShrink:0}}>
-                    {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:11}}>🏖</span>
-                      <span style={{fontFamily:font,fontSize:10,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
-                    </div>:shifts.length>0?<div style={{height:"100%",background:col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",flexDirection:"column",justifyContent:"center"}}>
-                      <div style={{fontFamily:font,fontSize:10,color:col,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</div>
-                      {shifts.map((s,si)=><div key={si} style={{fontFamily:font,fontSize:9,color:col+"dd",overflow:"hidden",whiteSpace:"nowrap"}}>{s.start}–{s.end}</div>)}
-                    </div>:<div style={{height:"100%"}}/>}
-                  </div>);
-                })}
-              </div>);
-            })}
-          </div>
-          </div>
-          <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center",padding:"4px 0"}}>
-            {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:8,height:8,borderRadius:2,background:getAvatarColor(emp.id)}}/><span style={{fontFamily:font,fontSize:9,color:C.text}}>{emp.name.split(" ")[0]}</span></div>)}
-            <div style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:8,height:8,borderRadius:2,background:C.green+"66",border:`1px solid ${C.green}`}}/><span style={{fontFamily:font,fontSize:9,color:C.muted}}>Vacaciones</span></div>
-          </div>
-        </div>);
-      })()}
+      {/* OVERVIEW */}
+      {adminTab==="overview"&&<CalendarioEquipo schedules={schedules} vacations={vacations} employees={employees} calMonthView={calMonthView} setCalMonthView={setCalMonthView}/>}
 
-                  {/* VACATIONS */}
+                        {/* VACATIONS */}
       {/* ── MODAL añadir/partir turno ── */}
       {addShift&&(()=>{
         const emp=employees.find(e=>e.id===addShift.empId);
@@ -824,80 +887,11 @@ export default function App(){
     {sub==="horarios"&&<HorariosEmpleado schedules={schedules} user={user} calWeekStart2={calWeekStart2} setCalWeekStart2={setCalWeekStart2} goHome={goHome}/>}
 
     {/* CALENDARIO EQUIPO empleado */}
-    {sub==="calendario"&&(()=>{
-      const year=Math.floor(calMonthView/100);const month=calMonthView%100;
-      const daysInMonth=new Date(year,month+1,0).getDate();
-      const prevMonth=()=>{const m=month===0?11:month-1;const y=month===0?year-1:year;setCalMonthView(y*100+m);};
-      const nextMonth=()=>{const m=month===11?0:month+1;const y=month===11?year+1:year;setCalMonthView(y*100+m);};
-      const MONTH_NAMES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-      const activeEmps=employees.filter(e=>e.active);
-      const firstDow=new Date(year,month,1).getDay();
-      const startDow=firstDow===0?6:firstDow-1;
-      const cells=[];
-      for(let i=0;i<startDow;i++)cells.push(null);
-      for(let d=1;d<=daysInMonth;d++)cells.push(d);
-      const dk=(d)=>`${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-      return(<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:12}}>
-        <button onClick={goHome} style={ss.back}>← Menú</button>
-        <div style={{fontSize:20,fontWeight:700}}>Calendario del equipo</div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <button onClick={prevMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>←</button>
-          <div style={{flex:1,textAlign:"center",fontSize:15,fontWeight:700,fontFamily:font}}>{MONTH_NAMES[month]} {year}</div>
-          <button onClick={nextMonth} style={{...ss.btn(C.card,C.muted),width:36,border:`1px solid ${C.border}`,padding:"6px",flexShrink:0}}>→</button>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:2}}>
-          {["L","M","X","J","V","S","D"].map(d=><div key={d} style={{textAlign:"center",fontFamily:font,fontSize:10,color:C.muted,padding:"3px 0",fontWeight:600}}>{d}</div>)}
-        </div>
-        <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(80px,1fr))",gap:3,minWidth:560}}>
-            {cells.map((day,i)=>{
-              if(!day)return<div key={i}/>;
-              const d=dk(day);
-              const today=d===dateKey();
-              const isWeekend=new Date(year,month,day).getDay()===0||new Date(year,month,day).getDay()===6;
-              const weekIdx=Math.floor(i/7);
-              const weekDaysInRow=cells.slice(weekIdx*7,weekIdx*7+7).filter(x=>x);
-              const empsThisWeek=activeEmps.filter(emp=>weekDaysInRow.some(wd=>{
-                const wdk=dk(wd);
-                const raw=schedules[emp.id+"_"+wdk];
-                const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
-                const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=wdk&&v.end>=wdk);
-                return shifts.length>0||!!vac;
-              }));
-              const maxShifts=Math.max(1,...empsThisWeek.map(emp=>weekDaysInRow.reduce((max,wd)=>{
-                const raw=schedules[emp.id+"_"+dk(wd)];
-                const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
-                return Math.max(max,shifts.length);
-              },1)));
-              return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column",gap:1}}>
-                <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
-                {empsThisWeek.map(emp=>{
-                  const col=getAvatarColor(emp.id);
-                  const raw=schedules[emp.id+"_"+d];
-                  const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
-                  const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
-                  const isMe=emp.id===user.id;
-                  return(<div key={emp.id} style={{height:42,marginBottom:2,flexShrink:0}}>
-                    {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",alignItems:"center",gap:4}}>
-                      <span style={{fontSize:11}}>🏖</span>
-                      <span style={{fontFamily:font,fontSize:10,color:C.green,fontWeight:700}}>{emp.name.split(" ")[0]}</span>
-                    </div>:shifts.length>0?<div style={{height:"100%",background:isMe?col+"44":col+"22",borderLeft:`3px solid ${col}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",flexDirection:"column",justifyContent:"center",boxShadow:isMe?`0 0 0 1px ${col}`:undefined}}>
-                      <div style={{fontFamily:font,fontSize:10,color:col,fontWeight:isMe?800:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}{isMe?" (yo)":""}</div>
-                      {shifts.map((s,si)=><div key={si} style={{fontFamily:font,fontSize:9,color:col+"dd",overflow:"hidden",whiteSpace:"nowrap"}}>{s.start}–{s.end}</div>)}
-                    </div>:<div style={{height:"100%"}}/>}
-                  </div>);
-                })}
-              </div>);
-            })}
-          </div>
-        </div>
-        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-          {activeEmps.map(emp=><div key={emp.id} style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:8,height:8,borderRadius:2,background:getAvatarColor(emp.id)}}/><span style={{fontFamily:font,fontSize:9,color:emp.id===user.id?C.accent:C.text,fontWeight:emp.id===user.id?700:400}}>{emp.name.split(" ")[0]}{emp.id===user.id?" (yo)":""}</span></div>)}
-        </div>
-      </div>);
-    })()}
+    {sub==="calendario"&&<div style={{padding:"16px 16px 80px"}}>
+      <CalendarioEquipo schedules={schedules} vacations={vacations} employees={employees} calMonthView={calMonthView} setCalMonthView={setCalMonthView} highlightUser={user.id} goHome={goHome}/>
+    </div>}
 
-    {/* FICHAR */}
+        {/* FICHAR */}
     {sub==="fichar"&&<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}><button onClick={goHome} style={ss.back}>← Menú</button>
       <div style={{textAlign:"center"}}><div style={{fontFamily:font,fontSize:40,fontWeight:700,letterSpacing:-2}}>{new Date().toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</div><div style={{fontFamily:font,fontSize:11,color:C.muted,marginTop:4,textTransform:"capitalize"}}>{fmtDateLong(new Date())}</div></div>
       <div style={{display:"flex",gap:10}}><div style={{...ss.card,padding:"12px 18px",textAlign:"center",flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.muted,letterSpacing:1}}>ESTADO</div><div style={{fontFamily:font,fontSize:15,fontWeight:700,color:myStatus==="in"?C.green:C.dim,marginTop:4}}>{myStatus==="in"?"Trabajando":"Fuera"}</div></div><div style={{...ss.card,padding:"12px 18px",textAlign:"center",flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.muted,letterSpacing:1}}>HOY</div><div style={{fontFamily:font,fontSize:15,fontWeight:700,color:C.accent,marginTop:4}}>{fmtDur(myWorked)}</div></div></div>
