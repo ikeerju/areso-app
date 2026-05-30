@@ -461,6 +461,28 @@ export default function App(){
               <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:14,fontWeight:700}}>{weekDays[0].num} {weekDays[0].month} — {weekDays[6].num} {weekDays[6].month}</div>
               <button onClick={()=>shiftWeek(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>→</button>
               <button onClick={()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));setCalWeekStart(dateKey(n));}} style={{...ss.btn(C.cardLight,C.accent),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>Hoy</button>
+              <button onClick={async()=>{
+                const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);weekDays.push(dateKey(d));}
+                const y=new Date(calWeekStart).getFullYear();const m=new Date(calWeekStart).getMonth();
+                const dim=new Date(y,m+1,0).getDate();
+                const ns={...schedules};let count=0;
+                for(const emp of activeEmps){
+                  for(let d=1;d<=dim;d++){
+                    const cdk=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                    const dow=new Date(cdk).getDay();const dowIdx=dow===0?6:dow-1;
+                    const srcDk=weekDays[dowIdx];
+                    if(!srcDk)continue;
+                    const raw=schedules[emp.id+"_"+srcDk];
+                    const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+                    if(shifts.length>0){
+                      await DB.deleteSchedule(emp.id,cdk);
+                      for(let si=0;si<shifts.length;si++){await DB.setSchedule(emp.id,cdk,shifts[si].start,shifts[si].end,si);}
+                      ns[emp.id+"_"+cdk]=shifts.length===1?shifts[0]:shifts;count++;
+                    }
+                  }
+                }
+                setSchedules(ns);flash(`Semana aplicada a todo el mes (${count} turnos) ✓`);
+              }} style={{...ss.btn(C.cardLight,C.green),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>📆 Aplicar al mes</button>
               <button onClick={()=>setScheduleView("month")} style={{...ss.btn(C.cardLight,C.muted),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>📆 Mes</button>
             </div>
             {activeEmps.map(emp=>{
@@ -602,28 +624,32 @@ export default function App(){
               const d=dk(day);
               const today=d===dateKey();
               const isWeekend=new Date(year,month,day).getDay()===0||new Date(year,month,day).getDay()===6;
-              // Get the week this day belongs to (row index in the grid)
               const weekIdx=Math.floor((i)/7);
-              // Get all days in this week
               const weekStart=weekIdx*7;
               const weekDaysInRow=cells.slice(weekStart,weekStart+7).filter(x=>x);
+              // Count how many employees work this week (for consistent row height)
+              const empsThisWeek=activeEmps.filter(emp=>weekDaysInRow.some(wd=>{
+                const wdk=dk(wd);
+                const raw=schedules[emp.id+"_"+wdk];
+                const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+                const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=wdk&&v.end>=wdk);
+                return shifts.length>0||!!vac;
+              }));
+              // Max shifts any employee has this week (for cell height)
+              const maxShifts=Math.max(1,...empsThisWeek.map(emp=>weekDaysInRow.reduce((max,wd)=>{
+                const raw=schedules[emp.id+"_"+dk(wd)];
+                const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+                return Math.max(max,shifts.length);
+              },1)));
+              const slotH=maxShifts>1?52+(maxShifts-1)*12:42;
               return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column",gap:1}}>
                 <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
-                {activeEmps.filter(emp=>{
-                  // Only show if works at least one day THIS WEEK
-                  return weekDaysInRow.some(wd=>{
-                    const wdk=dk(wd);
-                    const raw=schedules[emp.id+"_"+wdk];
-                    const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
-                    const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=wdk&&v.end>=wdk);
-                    return shifts.length>0||!!vac;
-                  });
-                }).map(emp=>{
+                {empsThisWeek.map(emp=>{
                   const col=getAvatarColor(emp.id);
                   const raw=schedules[emp.id+"_"+d];
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
-                  return(<div key={emp.id} style={{height:52,marginBottom:2,flexShrink:0}}>
+                  return(<div key={emp.id} style={{height:slotH,marginBottom:2,flexShrink:0}}>
                     {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{fontSize:11}}>🏖</span>
                       <span style={{fontFamily:font,fontSize:10,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
@@ -839,23 +865,28 @@ export default function App(){
               const isWeekend=new Date(year,month,day).getDay()===0||new Date(year,month,day).getDay()===6;
               const weekIdx=Math.floor(i/7);
               const weekDaysInRow=cells.slice(weekIdx*7,weekIdx*7+7).filter(x=>x);
+              const empsThisWeek=activeEmps.filter(emp=>weekDaysInRow.some(wd=>{
+                const wdk=dk(wd);
+                const raw=schedules[emp.id+"_"+wdk];
+                const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+                const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=wdk&&v.end>=wdk);
+                return shifts.length>0||!!vac;
+              }));
+              const maxShifts=Math.max(1,...empsThisWeek.map(emp=>weekDaysInRow.reduce((max,wd)=>{
+                const raw=schedules[emp.id+"_"+dk(wd)];
+                const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+                return Math.max(max,shifts.length);
+              },1)));
+              const slotH=maxShifts>1?52+(maxShifts-1)*12:42;
               return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column",gap:1}}>
                 <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
-                {activeEmps.filter(emp=>{
-                  return weekDaysInRow.some(wd=>{
-                    const wdk=dk(wd);
-                    const raw=schedules[emp.id+"_"+wdk];
-                    const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
-                    const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=wdk&&v.end>=wdk);
-                    return shifts.length>0||!!vac;
-                  });
-                }).map(emp=>{
+                {empsThisWeek.map(emp=>{
                   const col=getAvatarColor(emp.id);
                   const raw=schedules[emp.id+"_"+d];
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
                   const isMe=emp.id===user.id;
-                  return(<div key={emp.id} style={{height:52,marginBottom:2,flexShrink:0}}>
+                  return(<div key={emp.id} style={{height:slotH,marginBottom:2,flexShrink:0}}>
                     {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{fontSize:11}}>🏖</span>
                       <span style={{fontFamily:font,fontSize:10,color:C.green,fontWeight:700}}>{emp.name.split(" ")[0]}</span>
