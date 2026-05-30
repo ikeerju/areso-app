@@ -627,7 +627,6 @@ export default function App(){
               const weekIdx=Math.floor((i)/7);
               const weekStart=weekIdx*7;
               const weekDaysInRow=cells.slice(weekStart,weekStart+7).filter(x=>x);
-              // Count how many employees work this week (for consistent row height)
               const empsThisWeek=activeEmps.filter(emp=>weekDaysInRow.some(wd=>{
                 const wdk=dk(wd);
                 const raw=schedules[emp.id+"_"+wdk];
@@ -635,13 +634,6 @@ export default function App(){
                 const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=wdk&&v.end>=wdk);
                 return shifts.length>0||!!vac;
               }));
-              // Max shifts any employee has this week (for cell height)
-              const maxShifts=Math.max(1,...empsThisWeek.map(emp=>weekDaysInRow.reduce((max,wd)=>{
-                const raw=schedules[emp.id+"_"+dk(wd)];
-                const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
-                return Math.max(max,shifts.length);
-              },1)));
-              const slotH=maxShifts>1?52+(maxShifts-1)*12:42;
               return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column",gap:1}}>
                 <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
                 {empsThisWeek.map(emp=>{
@@ -649,7 +641,7 @@ export default function App(){
                   const raw=schedules[emp.id+"_"+d];
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
-                  return(<div key={emp.id} style={{height:slotH,marginBottom:2,flexShrink:0}}>
+                  return(<div key={emp.id} style={{height:42,marginBottom:2,flexShrink:0}}>
                     {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{fontSize:11}}>🏖</span>
                       <span style={{fontFamily:font,fontSize:10,color:C.green,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
@@ -877,7 +869,6 @@ export default function App(){
                 const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                 return Math.max(max,shifts.length);
               },1)));
-              const slotH=maxShifts>1?52+(maxShifts-1)*12:42;
               return(<div key={day} style={{background:today?C.accent+"15":isWeekend?"#f5f5ff":C.card,border:`1px solid ${today?C.accent+"55":C.border}`,borderRadius:8,padding:"4px 3px",display:"flex",flexDirection:"column",gap:1}}>
                 <div style={{fontFamily:font,fontSize:11,fontWeight:today?700:500,color:today?C.accent:isWeekend?C.purple:C.text,textAlign:"center",marginBottom:3}}>{day}</div>
                 {empsThisWeek.map(emp=>{
@@ -886,7 +877,7 @@ export default function App(){
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   const vac=vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d&&v.end>=d);
                   const isMe=emp.id===user.id;
-                  return(<div key={emp.id} style={{height:slotH,marginBottom:2,flexShrink:0}}>
+                  return(<div key={emp.id} style={{height:42,marginBottom:2,flexShrink:0}}>
                     {vac?<div style={{height:"100%",background:C.green+"33",borderLeft:`3px solid ${C.green}`,borderRadius:"0 4px 4px 0",padding:"3px 6px",display:"flex",alignItems:"center",gap:4}}>
                       <span style={{fontSize:11}}>🏖</span>
                       <span style={{fontFamily:font,fontSize:10,color:C.green,fontWeight:700}}>{emp.name.split(" ")[0]}</span>
