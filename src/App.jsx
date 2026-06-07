@@ -378,6 +378,38 @@ export default function App(){
 
       {/* RECORDS */}
       {adminTab==="records"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {/* Añadir fichaje manual */}
+        <div style={{...ss.card,display:"flex",flexDirection:"column",gap:8}}>
+          <div style={ss.label}>Añadir fichaje</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <select id="rec-emp" style={{...ss.input,flex:2,minWidth:120}}>
+              <option value="">Empleado...</option>
+              {employees.filter(e=>e.active).map(e=><option key={e.id} value={e.id}>{e.name.split(" ")[0]}</option>)}
+            </select>
+            <select id="rec-type" style={{...ss.input,flex:1,minWidth:90}}>
+              <option value="in">Entrada</option>
+              <option value="out">Salida</option>
+            </select>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <input type="date" id="rec-date" defaultValue={filterDate} style={{...ss.input,flex:1}}/>
+            <input type="time" id="rec-time" style={{...ss.input,flex:1}}/>
+          </div>
+          <button onClick={async()=>{
+            const empId=document.getElementById("rec-emp").value;
+            const type=document.getElementById("rec-type").value;
+            const date=document.getElementById("rec-date").value;
+            const time=document.getElementById("rec-time").value;
+            if(!empId||!date||!time)return flash("Rellena todos los campos",false);
+            const [h,m]=time.split(":");
+            const dt=new Date(date);dt.setHours(+h,+m,0,0);
+            const rec={empId,type,time:dt.getTime(),photo:null};
+            await DB.addClockIn(rec);
+            const dk=dateKey(dt);
+            setRecords({...records,[dk]:[...(records[dk]||[]),{...rec,id:Date.now()}]});
+            flash(`Fichaje añadido ✓`);loadData();
+          }} style={ss.btn(C.accent,"#fff")}>+ Añadir fichaje</button>
+        </div>
         <div style={{display:"flex",gap:8}}><button onClick={()=>{const d=new Date(filterDate);d.setDate(d.getDate()-1);setFilterDate(dateKey(d));}} style={{...ss.btn(C.card,C.muted),width:44,border:`1px solid ${C.border}`}}>←</button><input type="date" value={filterDate} onChange={e=>setFilterDate(e.target.value)} style={{...ss.input,flex:1}}/><button onClick={()=>{const d=new Date(filterDate);d.setDate(d.getDate()+1);setFilterDate(dateKey(d));}} style={{...ss.btn(C.card,C.muted),width:44,border:`1px solid ${C.border}`}}>→</button></div>
         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{employees.filter(e=>e.active).map(emp=>{const w=getWorked(records,emp.id,filterDate);if(!w&&!(records[filterDate]||[]).some(r=>r.empId===emp.id))return null;return<div key={emp.id} style={{...ss.card,padding:"5px 10px",fontFamily:font,fontSize:11}}>{emp.name.split(" ")[0]} <span style={{color:C.accent,marginLeft:4}}>{fmtDur(w)}</span></div>;})}</div>
         {(records[filterDate]||[]).sort((a,b)=>a.time-b.time).map(r=>{const emp=employees.find(e=>e.id===r.empId);return(<div key={r.id} style={{...ss.card,padding:10,display:"flex",flexDirection:"column",gap:6}}>
@@ -823,6 +855,33 @@ export default function App(){
           <div style={{display:"flex",gap:8,marginBottom:12}}><div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:4}}>Desde</div><input type="date" value={exportFrom} onChange={e=>setExportFrom(e.target.value)} style={ss.input}/></div><div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:4}}>Hasta</div><input type="date" value={exportTo} onChange={e=>setExportTo(e.target.value)} style={ss.input}/></div></div>
           <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
             {[{l:"Esta semana",fn:()=>{const n=new Date();const d=n.getDay()||7;const m=new Date(n);m.setDate(n.getDate()-(d-1));setExportFrom(dateKey(m));setExportTo(dateKey());}},{l:"Este mes",fn:()=>{const n=new Date();setExportFrom(n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-01");setExportTo(dateKey());}},{l:"Mes pasado",fn:()=>{const n=new Date();n.setMonth(n.getMonth()-1);setExportFrom(dateKey(new Date(n.getFullYear(),n.getMonth(),1)));setExportTo(dateKey(new Date(n.getFullYear(),n.getMonth()+1,0)));}}].map(r=><button key={r.l} onClick={r.fn} style={{padding:"6px 12px",borderRadius:8,border:`1px solid ${C.border}`,background:"transparent",color:C.muted,cursor:"pointer",fontFamily:font,fontSize:10}}>{r.l}</button>)}
+          </div>
+          {/* Resumen visual de horas */}
+          <div style={{marginBottom:16}}>
+            <div style={ss.label}>Resumen del periodo</div>
+            <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:8}}>
+              {employees.filter(e=>e.active).map(emp=>{
+                let ms=0,days=0;
+                const d1=new Date(exportFrom),d2=new Date(exportTo);
+                for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){const w=getWorked(records,emp.id,dateKey(d));if(w>0){ms+=w;days++;}}
+                if(!ms)return null;
+                const col=getAvatarColor(emp.id);
+                const pct=Math.min(100,ms/(8*3600000*days||1)*100);
+                return(<div key={emp.id} style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{...ss.avatar(col,28),flexShrink:0}}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                      <span style={{fontFamily:font,fontSize:11,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{emp.name.split(" ")[0]}</span>
+                      <span style={{fontFamily:font,fontSize:11,color:C.accent,fontWeight:700,flexShrink:0,marginLeft:8}}>{fmtDur(ms)}</span>
+                    </div>
+                    <div style={{height:6,borderRadius:3,background:C.border,overflow:"hidden"}}>
+                      <div style={{height:"100%",width:`${pct}%`,background:col,borderRadius:3,transition:"width .3s"}}/>
+                    </div>
+                    <div style={{fontFamily:font,fontSize:9,color:C.muted,marginTop:2}}>{days} días · media {days?fmtDur(ms/days):"—"}</div>
+                  </div>
+                </div>);
+              })}
+            </div>
           </div>
           <button onClick={()=>{const csv=generateReport(employees,records,schedules,vacations,documents,exportFrom,exportTo);const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`ARESO_${exportFrom}_${exportTo}.csv`;a.click();flash("Descargado");}} style={ss.btn(C.accent,"#000")}>📥 Descargar informe</button>
         </div>
