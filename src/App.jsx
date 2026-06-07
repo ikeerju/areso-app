@@ -352,7 +352,7 @@ export default function App(){
 
   // ═══ ADMIN PANEL ═══
   if(view==="admin"){
-    const tabs=[{id:"live",l:"📡 Directo"},{id:"schedule",l:"📅 Horarios"},{id:"overview",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"incidencias",l:"📬 Buzón"},{id:"export",l:"📥 Exportar"}];
+    const tabs=[{id:"live",l:"📡 Directo"},{id:"schedule",l:"📅 Horarios"},{id:"overview",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"incidencias",l:"📬 Buzón"},{id:"export",l:"📥 Exportar"},{id:"guia",l:"📖 Guía"}];
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px 32px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
@@ -887,6 +887,43 @@ export default function App(){
         </div>
       </div>}
 
+      {adminTab==="guia"&&(()=>{
+        const url="https://areso-app.vercel.app";
+        const Step=({n,text})=><div style={{display:"flex",gap:12,alignItems:"flex-start"}}><div style={{width:26,height:26,borderRadius:"50%",background:C.accent,color:"#fff",fontFamily:font,fontSize:12,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n}</div><div style={{fontFamily:font,fontSize:13,color:C.text,lineHeight:1.6,paddingTop:3}}>{text}</div></div>;
+        const Section=({title,color,children})=><div style={{...ss.card,borderLeft:`4px solid ${color}`}}><div style={{fontFamily:font,fontSize:14,fontWeight:700,color,marginBottom:14}}>{title}</div><div style={{display:"flex",flexDirection:"column",gap:12}}>{children}</div></div>;
+        return(<div style={{display:"flex",flexDirection:"column",gap:16}}>
+          <div style={{...ss.card,background:`linear-gradient(135deg,${C.accent}15,${C.accent}05)`,textAlign:"center",padding:"20px 16px"}}>
+            <div style={{fontSize:28,marginBottom:8}}>📱</div>
+            <div style={{fontFamily:font,fontSize:16,fontWeight:700,marginBottom:6}}>Cómo instalar ARESO</div>
+            <div style={{fontFamily:font,fontSize:12,color:C.muted}}>Guía para instalar la app en el móvil</div>
+            <div style={{fontFamily:font,fontSize:11,color:C.accent,marginTop:8,background:C.accent+"15",borderRadius:8,padding:"6px 12px",display:"inline-block"}}>🔗 {url}</div>
+          </div>
+
+          <Section title="📱 iPhone / iPad (iOS)" color="#007AFF">
+            <Step n="1" text={<>Abre <strong>Safari</strong> en tu iPhone (importante: tiene que ser Safari, no Chrome)</>}/>
+            <Step n="2" text={<>Escribe o pega la dirección: <strong style={{color:C.accent}}>{url}</strong></>}/>
+            <Step n="3" text={<>Espera a que cargue la app y pulsa el botón de <strong>compartir</strong> — es el icono con una flecha hacia arriba que aparece abajo en el centro de la pantalla</>}/>
+            <Step n="4" text={<>Desliza hacia abajo en el menú que aparece y pulsa <strong>"Añadir a pantalla de inicio"</strong></>}/>
+            <Step n="5" text={<>Pulsa <strong>"Añadir"</strong> arriba a la derecha. ¡Listo! Verás el icono de ARESO en tu pantalla de inicio</>}/>
+          </Section>
+
+          <Section title="🤖 Android (móvil Android)" color="#34A853">
+            <Step n="1" text={<>Abre <strong>Google Chrome</strong> en tu móvil Android</>}/>
+            <Step n="2" text={<>Copia esta dirección: <strong style={{color:C.accent}}>{url}</strong> — mantenla pulsada para copiarla</>}/>
+            <Step n="3" text={<>Pégala en la barra de direcciones de Chrome (la franja larga de arriba donde pone la dirección web) y pulsa el botón de ir (flecha o "Enter")</>}/>
+            <Step n="4" text={<>Cuando cargue la app, pulsa los <strong>tres puntos</strong> ⋮ que aparecen arriba a la derecha</>}/>
+            <Step n="5" text={<>En el menú que aparece, pulsa <strong>"Añadir a pantalla de inicio"</strong> o <strong>"Instalar aplicación"</strong></>}/>
+            <Step n="6" text={<>Pulsa <strong>"Añadir"</strong>. ¡Listo! Verás el icono de ARESO en tu pantalla de inicio</>}/>
+            <div style={{background:"#34A85315",borderRadius:10,padding:"10px 14px",fontFamily:font,fontSize:12,color:"#34A853",borderLeft:"3px solid #34A853"}}>⚠️ <strong>Si el enlace no se te abre en Chrome:</strong> copia la dirección <strong>{url}</strong>, abre Chrome manualmente, y pégala en la barra de arriba.</div>
+          </Section>
+
+          <div style={{...ss.card,background:"#fefce8",borderLeft:`4px solid ${C.orange}`}}>
+            <div style={{fontFamily:font,fontSize:13,fontWeight:700,color:C.orange,marginBottom:8}}>💡 Consejo</div>
+            <div style={{fontFamily:font,fontSize:13,color:C.text,lineHeight:1.6}}>Una vez instalada, la app funciona como una aplicación normal. Búscala en tu pantalla de inicio o en el cajón de apps. No necesitas descargarla de ninguna tienda.</div>
+          </div>
+        </div>);
+      })()}
+
     </div></div>);
   }
 
@@ -1085,6 +1122,45 @@ export default function App(){
       </div>);
     })()}
 
+    {/* GUÍA DE INSTALACIÓN empleado */}
+    {sub==="guia"&&(()=>{
+      const url="https://areso-app.vercel.app";
+      const Step=({n,text})=><div style={{display:"flex",gap:12,alignItems:"flex-start"}}><div style={{width:26,height:26,borderRadius:"50%",background:C.accent,color:"#fff",fontFamily:font,fontSize:12,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{n}</div><div style={{fontFamily:font,fontSize:13,color:C.text,lineHeight:1.6,paddingTop:3}}>{text}</div></div>;
+      return(<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}>
+        <button onClick={goHome} style={ss.back}>← Menú</button>
+        <div style={{fontSize:20,fontWeight:700}}>📱 Instalar ARESO</div>
+        <div style={{...ss.card,background:`linear-gradient(135deg,${C.accent}15,${C.accent}05)`,textAlign:"center"}}>
+          <div style={{fontFamily:font,fontSize:13,color:C.muted,marginBottom:6}}>Dirección de la app</div>
+          <div style={{fontFamily:font,fontSize:14,fontWeight:700,color:C.accent}}>{url}</div>
+        </div>
+        <div style={{...ss.card,borderLeft:"4px solid #007AFF"}}>
+          <div style={{fontFamily:font,fontSize:14,fontWeight:700,color:"#007AFF",marginBottom:14}}>📱 iPhone (iOS)</div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <Step n="1" text={<>Abre <strong>Safari</strong> (el navegador con el icono de brújula, NO uses Chrome)</>}/>
+            <Step n="2" text={<>Escribe en la barra de arriba: <strong style={{color:C.accent}}>{url}</strong></>}/>
+            <Step n="3" text={<>Pulsa el botón de <strong>compartir</strong> — la flecha hacia arriba en el centro abajo</>}/>
+            <Step n="4" text={<>Desliza y pulsa <strong>"Añadir a pantalla de inicio"</strong></>}/>
+            <Step n="5" text={<>Pulsa <strong>"Añadir"</strong>. ¡Ya está en tu pantalla de inicio!</>}/>
+          </div>
+        </div>
+        <div style={{...ss.card,borderLeft:"4px solid #34A853"}}>
+          <div style={{fontFamily:font,fontSize:14,fontWeight:700,color:"#34A853",marginBottom:14}}>🤖 Android</div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            <Step n="1" text={<>Abre <strong>Chrome</strong> (el círculo de colores)</>}/>
+            <Step n="2" text={<>Pulsa la barra de arriba, borra lo que pone y escribe: <strong style={{color:C.accent}}>{url}</strong></>}/>
+            <Step n="3" text="Pulsa los tres puntos ⋮ arriba a la derecha"/>
+            <Step n="4" text={<>Pulsa <strong>"Añadir a pantalla de inicio"</strong> o <strong>"Instalar"</strong></>}/>
+            <Step n="5" text={<>Pulsa <strong>"Añadir"</strong>. ¡Ya está!</>}/>
+            <div style={{background:"#34A85315",borderRadius:10,padding:"10px 14px",fontFamily:font,fontSize:12,color:"#34A853",borderLeft:"3px solid #34A853"}}>⚠️ Si el enlace no abre Chrome: copia <strong>{url}</strong>, abre Chrome y pégalo arriba.</div>
+          </div>
+        </div>
+        <div style={{...ss.card,background:"#fefce8",borderLeft:`4px solid ${C.orange}`}}>
+          <div style={{fontFamily:font,fontSize:13,fontWeight:700,color:C.orange,marginBottom:6}}>💡 Una vez instalada</div>
+          <div style={{fontFamily:font,fontSize:13,color:C.text,lineHeight:1.6}}>La app aparece en tu pantalla de inicio como cualquier otra. No necesitas descargarla de ninguna tienda.</div>
+        </div>
+      </div>);
+    })()}
+
     {/* ─── MENU ─── */}
     {!sub&&page==="menu"&&<>
       <div style={ss.header}><div style={{display:"flex",alignItems:"center",gap:14}}><div style={{width:44,height:44,borderRadius:"50%",background:"#ffffff33",border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:16,fontWeight:700,color:"#fff"}}>{user.name.charAt(0)}</div><div><div style={{fontFamily:font,fontSize:10,color:"#ffffffaa",letterSpacing:1}}>Bienvenid@</div><div style={{fontSize:18,fontWeight:700,color:"#fff"}}>{user.name.toUpperCase()}</div></div></div></div>
@@ -1136,6 +1212,10 @@ export default function App(){
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <div style={ss.moduleCard} onClick={()=>setSub("vacaciones")}>{Ic.vac}<span style={{fontSize:14,fontWeight:600}}>Vacaciones</span></div>
           <div style={ss.moduleCard} onClick={()=>setSub("docs")}>{Ic.doc}<span style={{fontSize:14,fontWeight:600}}>Documentos</span></div>
+        </div>
+        <div style={ss.secTitle}>Ayuda</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
+          <div style={ss.moduleCard} onClick={()=>setSub("guia")}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg><span style={{fontSize:14,fontWeight:600}}>Guía de instalación</span></div>
         </div>
       </div>
     </>}
