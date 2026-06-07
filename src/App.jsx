@@ -13,8 +13,8 @@ const DB = {
   async updatePin(id,newPin) { await sb.from('areso_employees').update({password:newPin}).eq('id',id); },
   async updateEmployeeProfile(id,f) { await sb.from('areso_employees').update({name:f.name,position:f.position,phone:f.phone,birthday:f.birthday||null,email:f.email}).eq('id',id); },
   async getClockIns(dateFrom,dateTo) { const {data}=await sb.from('areso_clockins').select('*').gte('time',dateFrom).lte('time',dateTo+'T23:59:59').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:r.photo_url})); },
-  async getAllClockIns() { const {data}=await sb.from('areso_clockins').select('*').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:r.photo_url})); },
-  async addClockIn(rec) { await sb.from('areso_clockins').insert({employee_id:rec.empId,type:rec.type,time:new Date(rec.time).toISOString(),photo_url:rec.photo||null}); },
+  async getAllClockIns() { const from=new Date();from.setMonth(from.getMonth()-3);const {data}=await sb.from('areso_clockins').select('id,employee_id,type,time').gte('time',from.toISOString()).order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:null})); },
+  async addClockIn(rec) { await sb.from('areso_clockins').insert({employee_id:rec.empId,type:rec.type,time:new Date(rec.time).toISOString(),photo_url:null}); },
   async deleteClockIn(id) { await sb.from('areso_clockins').delete().eq('id',id); },
   async updateClockIn(id,time) { await sb.from('areso_clockins').update({time:new Date(time).toISOString()}).eq('id',id); },
   async getSchedules() { const {data}=await sb.from('areso_schedules').select('*').order('shift_index'); const scheds={};(data||[]).forEach(s=>{const key=s.employee_id+"_"+s.date_key;if(!scheds[key])scheds[key]=[];scheds[key].push({id:s.id,empId:s.employee_id,start:s.start_time,end:s.end_time,shiftIndex:s.shift_index});});return scheds; },
@@ -220,7 +220,7 @@ export default function App(){
   },[]);
 
   useEffect(()=>{loadData();},[loadData]);
-  useEffect(()=>{const t=setInterval(()=>{tick(x=>x+1);loadData();},30000);return()=>clearInterval(t);},[loadData]);
+  useEffect(()=>{const t=setInterval(()=>{tick(x=>x+1);loadData();},300000);return()=>clearInterval(t);},[loadData]);
 
   const flash=(msg,ok=true)=>{setToast({msg,ok});setTimeout(()=>setToast(null),2000);};
   const startCamera=async()=>{try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});streamRef.current=s;setCameraOn(true);setTimeout(()=>{if(videoRef.current)videoRef.current.srcObject=s;},100);}catch{flash("Cámara no disponible",false);}};
@@ -416,7 +416,6 @@ export default function App(){
           <div style={{display:"flex",alignItems:"center",gap:8,fontFamily:font,fontSize:12}}><span style={{color:C.accent,minWidth:44}}>{fmtTime(r.time)}</span><span style={{flex:1}}>{emp?.name?.split(" ")[0]}</span><span style={{color:r.type==="in"?C.green:C.red,fontSize:11}}>{r.type==="in"?"Entrada":"Salida"}</span>
           <button onClick={()=>{setEditRecId(editRecId===r.id?null:r.id);setEditTimeVal("");}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:12}}>✎</button>
           <button onClick={async()=>{await DB.deleteClockIn(r.id);setRecords({...records,[filterDate]:(records[filterDate]||[]).filter(x=>x.id!==r.id)});flash("Eliminado");}} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontSize:12}}>✕</button></div>
-          {r.photo&&<img src={r.photo} alt="" style={{width:"100%",maxHeight:80,objectFit:"cover",borderRadius:8}}/>}
           {editRecId===r.id&&<div style={{display:"flex",gap:6}}><input type="time" value={editTimeVal} onChange={e=>setEditTimeVal(e.target.value)} style={{...ss.input,flex:1}}/><button onClick={async()=>{if(!editTimeVal)return;const[h,m]=editTimeVal.split(":");const d=new Date(r.time);d.setHours(+h,+m,0);await DB.updateClockIn(r.id,d.getTime());setRecords({...records,[filterDate]:(records[filterDate]||[]).map(x=>{if(x.id!==r.id)return x;return{...x,time:d.getTime()};})});setEditRecId(null);flash("Actualizado");}} style={{background:C.accent,border:"none",color:"#000",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontFamily:font,fontSize:11,fontWeight:700}}>✓</button></div>}
         </div>);})}
         {!(records[filterDate]||[]).length&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin registros</div>}
