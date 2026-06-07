@@ -29,6 +29,9 @@ const DB = {
   async addAnnouncement(ann) { await sb.from('areso_announcements').insert({title:ann.title,body:ann.body}); },
   async deleteAnnouncement(id) { await sb.from('areso_announcements').delete().eq('id',id); },
   async markAnnouncementRead(id,userId) { const {data}=await sb.from('areso_announcements').select('read_by').eq('id',id).single(); const readBy=[...(data?.read_by||[]),userId]; await sb.from('areso_announcements').update({read_by:readBy}).eq('id',id); },
+  async getIncidencias() { const {data}=await sb.from('areso_incidencias').select('*').order('created_at',{ascending:false}); return (data||[]).map(i=>({id:i.id,empId:i.employee_id,dateRef:i.date_ref,timeRef:i.time_ref,description:i.description,adminReply:i.admin_reply,status:i.status,createdAt:i.created_at})); },
+  async addIncidencia(inc) { await sb.from('areso_incidencias').insert({employee_id:inc.empId,date_ref:inc.dateRef,time_ref:inc.timeRef,description:inc.description,status:'pending'}); },
+  async replyIncidencia(id,reply) { await sb.from('areso_incidencias').update({admin_reply:reply,status:'replied'}).eq('id',id); },
 };
 const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 const MONTHS=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -154,6 +157,7 @@ export default function App(){
   const [vacations,setVacations]=useState([]);
   const [documents,setDocuments]=useState([]);
   const [announcements,setAnnouncements]=useState([]);
+  const [incidencias,setIncidencias]=useState([]);
   const [loading,setLoading]=useState(true);
 
   const [view,setView]=useState("login");
@@ -193,18 +197,21 @@ export default function App(){
   const [docForm,setDocForm]=useState({type:"medical",notes:""});
   const [docFile,setDocFile]=useState(null);
   const [annForm,setAnnForm]=useState({title:"",body:""});
+  const [incForm,setIncForm]=useState({dateRef:"",timeRef:"",description:""});
+  const [replyForm,setReplyForm]=useState({});
 
   // Load all data from Supabase on mount
   const loadData=useCallback(async()=>{
     try{
-      const [emps,scheds,vacs,docs,anns,clockins]=await Promise.all([
-        DB.getEmployees(),DB.getSchedules(),DB.getVacations(),DB.getDocuments(),DB.getAnnouncements(),DB.getAllClockIns()
+      const [emps,scheds,vacs,docs,anns,clockins,incs]=await Promise.all([
+        DB.getEmployees(),DB.getSchedules(),DB.getVacations(),DB.getDocuments(),DB.getAnnouncements(),DB.getAllClockIns(),DB.getIncidencias()
       ]);
       setEmployees(emps);
       setSchedules(scheds);
       setVacations(vacs);
       setDocuments(docs);
       setAnnouncements(anns);
+      setIncidencias(incs);
       // Group clockins by date
       const recs={};clockins.forEach(r=>{const dk=dateKey(new Date(r.time));if(!recs[dk])recs[dk]=[];recs[dk].push(r);});
       setRecords(recs);
@@ -345,7 +352,7 @@ export default function App(){
 
   // ═══ ADMIN PANEL ═══
   if(view==="admin"){
-    const tabs=[{id:"live",l:"📡 Directo"},{id:"schedule",l:"📅 Horarios"},{id:"overview",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"export",l:"📥 Exportar"}];
+    const tabs=[{id:"live",l:"📡 Directo"},{id:"schedule",l:"📅 Horarios"},{id:"overview",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"incidencias",l:"📬 Buzón"},{id:"export",l:"📥 Exportar"}];
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px 32px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
@@ -464,22 +471,15 @@ export default function App(){
               <button onClick={async()=>{
                 const wDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);wDays.push(dateKey(d));}
                 const y=new Date(calWeekStart).getFullYear();const m=new Date(calWeekStart).getMonth();
-                const dim=new Date(y,m+1,0).getDate();
-                const ns={...schedules};let count=0;
-                for(const emp of activeEmps){
-                  for(let d=1;d<=dim;d++){
-                    const cdk=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-                    const dow=new Date(cdk).getDay();const dowIdx=dow===0?6:dow-1;
-                    const srcDk=wDays[dowIdx];if(!srcDk)continue;
-                    const raw=schedules[emp.id+"_"+srcDk];
-                    const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
-                    if(shifts.length>0){
-                      await DB.deleteSchedule(emp.id,cdk);
-                      for(let si=0;si<shifts.length;si++){await DB.setSchedule(emp.id,cdk,shifts[si].start,shifts[si].end,si);}
-                      ns[emp.id+"_"+cdk]=shifts;count++;
-                    }
-                  }
-                }
+                const dim=new Date(y,m+1,0).getDate();const ns={...schedules};let count=0;
+                for(const emp of activeEmps){for(let d=1;d<=dim;d++){
+                  const cdk=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+                  const dow=new Date(cdk).getDay();const dowIdx=dow===0?6:dow-1;
+                  const srcDk=wDays[dowIdx];if(!srcDk)continue;
+                  const raw=schedules[emp.id+"_"+srcDk];
+                  const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+                  if(shifts.length>0){await DB.deleteSchedule(emp.id,cdk);for(let si=0;si<shifts.length;si++){await DB.setSchedule(emp.id,cdk,shifts[si].start,shifts[si].end,si);}ns[emp.id+"_"+cdk]=shifts;count++;}
+                }}
                 setSchedules(ns);flash(`Semana aplicada al mes (${count} turnos) ✓`);
               }} style={{...ss.btn(C.cardLight,C.green),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>📆 Aplicar al mes</button>
               <button onClick={()=>setScheduleView("month")} style={{...ss.btn(C.cardLight,C.muted),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>📆 Mes</button>
@@ -773,9 +773,7 @@ export default function App(){
             if(!empId||!start||!end)return flash("Rellena todos los campos",false);
             await DB.addVacation({empId,start,end,notes:"Añadido por admin"});
             if(status==="approved"){const {data}=await sb.from('areso_vacations').select('id').eq('employee_id',empId).eq('start_date',start).order('id',{ascending:false}).limit(1);if(data?.[0])await DB.updateVacation(data[0].id,"approved");}
-            document.getElementById("vac-emp-sel").value="";
-            document.getElementById("vac-start").value="";
-            document.getElementById("vac-end").value="";
+            document.getElementById("vac-emp-sel").value="";document.getElementById("vac-start").value="";document.getElementById("vac-end").value="";
             flash("Vacaciones añadidas ✓");loadData();
           }} style={ss.btn(C.accent,"#fff")}>+ Añadir vacaciones</button>
         </div>
@@ -795,6 +793,30 @@ export default function App(){
       </div>}
 
       {/* EXPORT */}
+      {adminTab==="incidencias"&&<div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {incidencias.length===0&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin incidencias</div>}
+        {incidencias.map(inc=>{
+          const emp=employees.find(e=>e.id===inc.empId);
+          const col=getAvatarColor(inc.empId);
+          return(<div key={inc.id} style={{...ss.card,display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={ss.avatar(col,34)}>{emp?.name?.[0]}</div>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:font,fontSize:13,fontWeight:700}}>{emp?.name?.split(" ")[0]}</div>
+                <div style={{fontFamily:font,fontSize:10,color:C.muted}}>{inc.dateRef} {inc.timeRef&&`· ${inc.timeRef}`}</div>
+              </div>
+              <div style={{fontFamily:font,fontSize:9,fontWeight:700,padding:"3px 8px",borderRadius:6,background:inc.status==="replied"?"#f0fdf4":"#fefce8",color:inc.status==="replied"?C.green:C.orange}}>{inc.status==="replied"?"RESPONDIDA":"PENDIENTE"}</div>
+            </div>
+            <div style={{fontFamily:font,fontSize:13,color:C.text,background:C.bg,borderRadius:8,padding:"10px 12px"}}>{inc.description}</div>
+            {inc.adminReply&&<div style={{fontFamily:font,fontSize:12,color:C.accent,background:C.accent+"0d",borderRadius:8,padding:"8px 12px",borderLeft:`3px solid ${C.accent}`}}>↩ {inc.adminReply}</div>}
+            {!inc.adminReply&&<div style={{display:"flex",gap:6}}>
+              <input placeholder="Responder..." value={replyForm[inc.id]||""} onChange={e=>setReplyForm({...replyForm,[inc.id]:e.target.value})} style={{...ss.input,flex:1,fontSize:12}}/>
+              <button onClick={async()=>{const reply=replyForm[inc.id];if(!reply)return;await DB.replyIncidencia(inc.id,reply);setReplyForm({...replyForm,[inc.id]:""});flash("Respuesta enviada ✓");loadData();}} style={{background:C.accent,border:"none",color:"#fff",borderRadius:10,padding:"8px 14px",cursor:"pointer",fontFamily:font,fontSize:12,fontWeight:700,flexShrink:0}}>Enviar</button>
+            </div>}
+          </div>);
+        })}
+      </div>}
+
       {adminTab==="export"&&<div style={{display:"flex",flexDirection:"column",gap:14}}>
         <div style={ss.card}>
           <div style={{fontSize:16,fontWeight:700,marginBottom:12}}>Generar informe</div>
@@ -921,6 +943,89 @@ export default function App(){
       {!announcements.length&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin comunicados</div>}
     </div>}
 
+    {/* BUZÓN DE INCIDENCIAS empleado */}
+    {sub==="buzon"&&<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}>
+      <button onClick={goHome} style={ss.back}>← Menú</button>
+      <div style={{fontSize:20,fontWeight:700}}>Buzón de incidencias</div>
+      <div style={{...ss.card,display:"flex",flexDirection:"column",gap:10}}>
+        <div style={ss.label}>Nueva incidencia</div>
+        <div style={{display:"flex",gap:8}}>
+          <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:4}}>Fecha</div><input type="date" value={incForm.dateRef} onChange={e=>setIncForm({...incForm,dateRef:e.target.value})} style={ss.input}/></div>
+          <div style={{flex:1}}><div style={{fontFamily:font,fontSize:9,color:C.dim,marginBottom:4}}>Hora (opcional)</div><input type="time" value={incForm.timeRef} onChange={e=>setIncForm({...incForm,timeRef:e.target.value})} style={ss.input}/></div>
+        </div>
+        <textarea placeholder="Describe el problema... (ej: me olvidé fichar la entrada a las 9:00)" value={incForm.description} onChange={e=>setIncForm({...incForm,description:e.target.value})} style={ss.textarea}/>
+        <button onClick={async()=>{
+          if(!incForm.dateRef||!incForm.description)return flash("Rellena la fecha y descripción",false);
+          await DB.addIncidencia({empId:user.id,dateRef:incForm.dateRef,timeRef:incForm.timeRef,description:incForm.description});
+          setIncForm({dateRef:"",timeRef:"",description:""});
+          flash("Incidencia enviada ✓");loadData();
+        }} style={ss.btn(C.accent,"#fff")}>📬 Enviar incidencia</button>
+      </div>
+      {incidencias.filter(i=>i.empId===user.id).map(inc=><div key={inc.id} style={{...ss.card,display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:font,fontSize:12,fontWeight:700}}>{inc.dateRef}{inc.timeRef&&` · ${inc.timeRef}`}</div>
+            <div style={{fontFamily:font,fontSize:10,color:C.muted}}>{new Date(inc.createdAt).toLocaleDateString("es-ES")}</div>
+          </div>
+          <div style={{fontFamily:font,fontSize:9,fontWeight:700,padding:"3px 8px",borderRadius:6,background:inc.status==="replied"?"#f0fdf4":"#fefce8",color:inc.status==="replied"?C.green:C.orange}}>{inc.status==="replied"?"RESPONDIDA":"PENDIENTE"}</div>
+        </div>
+        <div style={{fontFamily:font,fontSize:13,color:C.text,background:C.bg,borderRadius:8,padding:"10px 12px"}}>{inc.description}</div>
+        {inc.adminReply&&<div style={{fontFamily:font,fontSize:12,color:C.accent,background:C.accent+"0d",borderRadius:8,padding:"8px 12px",borderLeft:`3px solid ${C.accent}`}}>↩ Admin: {inc.adminReply}</div>}
+      </div>)}
+      {incidencias.filter(i=>i.empId===user.id).length===0&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin incidencias enviadas</div>}
+    </div>}
+
+    {/* MIS FICHAJES empleado */}
+    {sub==="misfichajes"&&(()=>{
+      const myClockIns=Object.values(records).flat().filter(r=>r.empId===user.id).sort((a,b)=>a.time-b.time);
+      const now=new Date();
+      // Weekly hours
+      const weekStart=new Date(now);const wd=weekStart.getDay()||7;weekStart.setDate(weekStart.getDate()-(wd-1));weekStart.setHours(0,0,0,0);
+      const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+      let weekMs=0,monthMs=0;
+      const dayKeys=[...new Set(myClockIns.map(r=>dateKey(new Date(r.time))))];
+      dayKeys.forEach(dk=>{
+        const w=getWorked(records,user.id,dk);
+        const d=new Date(dk);
+        if(d>=weekStart)weekMs+=w;
+        if(d>=monthStart)monthMs+=w;
+      });
+      // Group by date
+      const byDate={};myClockIns.forEach(r=>{const dk=dateKey(new Date(r.time));if(!byDate[dk])byDate[dk]=[];byDate[dk].push(r);});
+      return(<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}>
+        <button onClick={goHome} style={ss.back}>← Menú</button>
+        <div style={{fontSize:20,fontWeight:700}}>Mis fichajes</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div style={{...ss.card,textAlign:"center",padding:"16px 10px"}}>
+            <div style={{fontFamily:font,fontSize:11,color:C.muted,marginBottom:6}}>ESTA SEMANA</div>
+            <div style={{fontFamily:font,fontSize:22,fontWeight:700,color:C.accent}}>{fmtDur(weekMs)}</div>
+          </div>
+          <div style={{...ss.card,textAlign:"center",padding:"16px 10px"}}>
+            <div style={{fontFamily:font,fontSize:11,color:C.muted,marginBottom:6}}>ESTE MES</div>
+            <div style={{fontFamily:font,fontSize:22,fontWeight:700,color:C.green}}>{fmtDur(monthMs)}</div>
+          </div>
+        </div>
+        {Object.keys(byDate).sort((a,b)=>b.localeCompare(a)).map(dk=>{
+          const recs=byDate[dk].sort((a,b)=>a.time-b.time);
+          const worked=getWorked(records,user.id,dk);
+          return(<div key={dk} style={ss.card}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+              <div style={{fontFamily:font,fontSize:13,fontWeight:700,textTransform:"capitalize"}}>{fmtDateLong(new Date(dk))}</div>
+              {worked>0&&<div style={{fontFamily:font,fontSize:12,fontWeight:700,color:C.accent}}>{fmtDur(worked)}</div>}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {recs.map(r=><div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",borderRadius:8,background:r.type==="in"?C.green+"0d":C.red+"0d"}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:r.type==="in"?C.green:C.red,flexShrink:0}}/>
+                <div style={{fontFamily:font,fontSize:13,fontWeight:600,color:r.type==="in"?C.green:C.red}}>{r.type==="in"?"Entrada":"Salida"}</div>
+                <div style={{fontFamily:font,fontSize:13,color:C.text,marginLeft:"auto"}}>{fmtTime(r.time)}</div>
+              </div>)}
+            </div>
+          </div>);
+        })}
+        {Object.keys(byDate).length===0&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin fichajes registrados</div>}
+      </div>);
+    })()}
+
     {/* ─── MENU ─── */}
     {!sub&&page==="menu"&&<>
       <div style={ss.header}><div style={{display:"flex",alignItems:"center",gap:14}}><div style={{width:44,height:44,borderRadius:"50%",background:"#ffffff33",border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:font,fontSize:16,fontWeight:700,color:"#fff"}}>{user.name.charAt(0)}</div><div><div style={{fontFamily:font,fontSize:10,color:"#ffffffaa",letterSpacing:1}}>Bienvenid@</div><div style={{fontSize:18,fontWeight:700,color:"#fff"}}>{user.name.toUpperCase()}</div></div></div></div>
@@ -962,6 +1067,11 @@ export default function App(){
         <div style={ss.secTitle}>Comunicación</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
           <div style={ss.moduleCard} onClick={()=>setSub("comunicados")}>{Ic.megaphone}<span style={{fontSize:14,fontWeight:600}}>Comunicados</span>{unreadAnns>0&&<div style={ss.badge(C.orange,"#fff")}>{unreadAnns}</div>}</div>
+          <div style={ss.moduleCard} onClick={()=>setSub("buzon")}>{Ic.mail}<span style={{fontSize:14,fontWeight:600}}>Buzón de incidencias</span>{incidencias.filter(i=>i.empId===user.id&&i.adminReply&&i.status==="replied").length>0&&<div style={ss.badge(C.accent,"#fff")}>{incidencias.filter(i=>i.empId===user.id&&i.adminReply&&i.status==="replied").length}</div>}</div>
+        </div>
+        <div style={ss.secTitle}>Mi actividad</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
+          <div style={ss.moduleCard} onClick={()=>setSub("misfichajes")}>{Ic.clock}<span style={{fontSize:14,fontWeight:600}}>Mis fichajes</span></div>
         </div>
         <div style={ss.secTitle}>Solicitudes</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
