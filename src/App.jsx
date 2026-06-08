@@ -12,8 +12,8 @@ const DB = {
   async updateEmployee(id,fields) { const dbFields={}; if('active' in fields)dbFields.active=fields.active; if('role' in fields)dbFields.role=fields.role; if('sick_leave' in fields)dbFields.sick_leave=fields.sick_leave; await sb.from('areso_employees').update(dbFields).eq('id',id); },
   async updatePin(id,newPin) { await sb.from('areso_employees').update({password:newPin}).eq('id',id); },
   async updateEmployeeProfile(id,f) { await sb.from('areso_employees').update({name:f.name,position:f.position,phone:f.phone,birthday:f.birthday||null,email:f.email}).eq('id',id); },
-  async getClockIns(dateFrom,dateTo) { const {data}=await sb.from('areso_clockins').select('*').gte('time',dateFrom).lte('time',dateTo+'T23:59:59').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:r.photo_url})); },
-  async getAllClockIns() { const from=new Date();from.setMonth(from.getMonth()-3);const {data}=await sb.from('areso_clockins').select('id,employee_id,type,time').gte('time',from.toISOString()).order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:null})); },
+  async getClockIns(dateFrom,dateTo) { const {data}=await sb.from('areso_clockins').select('id,employee_id,type,time').gte('time',dateFrom).lte('time',dateTo+'T23:59:59').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:null})); },
+  async getAllClockIns() { const from=new Date();from.setMonth(from.getMonth()-12);const {data}=await sb.from('areso_clockins').select('id,employee_id,type,time').gte('time',from.toISOString()).order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:null})); },
   async addClockIn(rec) { await sb.from('areso_clockins').insert({employee_id:rec.empId,type:rec.type,time:new Date(rec.time).toISOString(),photo_url:null}); },
   async deleteClockIn(id) { await sb.from('areso_clockins').delete().eq('id',id); },
   async updateClockIn(id,time) { await sb.from('areso_clockins').update({time:new Date(time).toISOString()}).eq('id',id); },
@@ -32,6 +32,7 @@ const DB = {
   async getIncidencias() { const {data}=await sb.from('areso_incidencias').select('*').order('created_at',{ascending:false}); return (data||[]).map(i=>({id:i.id,empId:i.employee_id,dateRef:i.date_ref,timeRef:i.time_ref,description:i.description,adminReply:i.admin_reply,status:i.status,createdAt:i.created_at})); },
   async addIncidencia(inc) { await sb.from('areso_incidencias').insert({employee_id:inc.empId,date_ref:inc.dateRef,time_ref:inc.timeRef,description:inc.description,status:'pending'}); },
   async replyIncidencia(id,reply) { await sb.from('areso_incidencias').update({admin_reply:reply,status:'replied'}).eq('id',id); },
+  async getMyClockIns(empId) { const from=new Date();from.setMonth(from.getMonth()-3);const {data}=await sb.from('areso_clockins').select('id,employee_id,type,time').eq('employee_id',empId).gte('time',from.toISOString()).order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime()})); },
 };
 const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 const MONTHS=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -199,12 +200,13 @@ export default function App(){
   const [annForm,setAnnForm]=useState({title:"",body:""});
   const [incForm,setIncForm]=useState({dateRef:"",timeRef:"",description:""});
   const [replyForm,setReplyForm]=useState({});
+  const [myClockInsData,setMyClockInsData]=useState(null);
 
   // Load all data from Supabase on mount
   const loadData=useCallback(async()=>{
     try{
-      const [emps,scheds,vacs,docs,anns,clockins,incs]=await Promise.all([
-        DB.getEmployees(),DB.getSchedules(),DB.getVacations(),DB.getDocuments(),DB.getAnnouncements(),DB.getAllClockIns(),DB.getIncidencias()
+      const [emps,scheds,vacs,docs,anns,incs]=await Promise.all([
+        DB.getEmployees(),DB.getSchedules(),DB.getVacations(),DB.getDocuments(),DB.getAnnouncements(),DB.getIncidencias()
       ]);
       setEmployees(emps);
       setSchedules(scheds);
@@ -212,22 +214,29 @@ export default function App(){
       setDocuments(docs);
       setAnnouncements(anns);
       setIncidencias(incs);
-      // Group clockins by date
-      const recs={};clockins.forEach(r=>{const dk=dateKey(new Date(r.time));if(!recs[dk])recs[dk]=[];recs[dk].push(r);});
+      // Load only today's clockins on startup
+      const todayRecs=await DB.getClockIns(dateKey(),dateKey());
+      const recs={};todayRecs.forEach(r=>{const dk=dateKey(new Date(r.time));if(!recs[dk])recs[dk]=[];recs[dk].push(r);});
       setRecords(recs);
     }catch(e){console.error("Error loading data:",e);}
     setLoading(false);
   },[]);
 
   useEffect(()=>{loadData();},[loadData]);
-  useEffect(()=>{const t=setInterval(()=>{tick(x=>x+1);loadData();},300000);return()=>clearInterval(t);},[loadData]);
+
+  const loadClockIns=useCallback(async(from,to)=>{
+    const clockins=await DB.getClockIns(from,to);
+    const recs={...records};
+    clockins.forEach(r=>{const dk=dateKey(new Date(r.time));if(!recs[dk])recs[dk]=[];if(!recs[dk].find(x=>x.id===r.id))recs[dk].push(r);});
+    setRecords(recs);
+  },[records]);
 
   const flash=(msg,ok=true)=>{setToast({msg,ok});setTimeout(()=>setToast(null),2000);};
   const startCamera=async()=>{try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});streamRef.current=s;setCameraOn(true);setTimeout(()=>{if(videoRef.current)videoRef.current.srcObject=s;},100);}catch{flash("Cámara no disponible",false);}};
   const stopCamera=()=>{if(streamRef.current){streamRef.current.getTracks().forEach(t=>t.stop());streamRef.current=null;}setCameraOn(false);};
   const takePhoto=()=>{if(!videoRef.current)return;const c=document.createElement("canvas");c.width=videoRef.current.videoWidth||640;c.height=videoRef.current.videoHeight||480;c.getContext("2d").drawImage(videoRef.current,0,0);setPhoto(c.toDataURL("image/jpeg",0.7));stopCamera();};
   const handleFile=e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=ev=>setPhoto(ev.target.result);r.readAsDataURL(f);e.target.value="";};
-  const goHome=()=>{setSub(null);stopCamera();setPhoto(null);setPage("menu");};
+  const goHome=()=>{setSub(null);stopCamera();setPhoto(null);setPage("menu");setMyClockInsData(null);};
 
   const handleLogin=()=>{const emp=employees.find(e=>e.name.toLowerCase()===loginForm.email.toLowerCase()&&e.pin===loginForm.pin&&e.active);if(emp){setUser(emp);setView("app");setPage("menu");setSub(null);}else flash("Credenciales incorrectas",false);};
   const handleRegister=async()=>{if(!regForm.name||!regForm.email||!regForm.pin)return flash("Rellena los campos obligatorios",false);if(employees.some(e=>e.email===regForm.email))return flash("Email ya registrado",false);const emp=await DB.addEmployee({name:regForm.name,email:regForm.email,pin:regForm.pin,position:regForm.position,phone:regForm.phone,birthday:regForm.birthday,role:"employee"});if(emp){setEmployees([...employees,emp]);flash("Cuenta creada");setView("login");}else flash("Error al crear cuenta",false);};
@@ -355,8 +364,12 @@ export default function App(){
     const tabs=[{id:"live",l:"📡 Directo"},{id:"schedule",l:"📅 Horarios"},{id:"overview",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"incidencias",l:"📬 Buzón"},{id:"export",l:"📥 Exportar"},{id:"guia",l:"📖 Guía"}];
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px 32px"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div><button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button></div>
-      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>{setAdminTab(t.id);setAddShift(null);setConfirmDelete(null);}} style={{padding:"10px 18px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:font,fontSize:13,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#fff":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={()=>loadData()} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.accent,cursor:"pointer",fontFamily:font,fontSize:11}}>↻ Actualizar</button>
+        <button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button>
+      </div></div>
+      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>{setAdminTab(t.id);setAddShift(null);setConfirmDelete(null);if(t.id==="records"){const d=new Date();d.setDate(d.getDate()-7);loadClockIns(dateKey(d),dateKey());}if(t.id==="export"){const d=new Date();d.setMonth(d.getMonth()-1);loadClockIns(dateKey(d),dateKey());}}} style={{padding:"10px 18px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:font,fontSize:13,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#fff":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
 
       {/* LIVE */}
       {adminTab==="live"&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -904,7 +917,16 @@ export default function App(){
               })}
             </div>
           </div>
-          <button onClick={()=>{const csv=generateReport(employees,records,schedules,vacations,documents,exportFrom,exportTo);const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`ARESO_${exportFrom}_${exportTo}.csv`;a.click();flash("Descargado");}} style={ss.btn(C.accent,"#000")}>📥 Descargar informe</button>
+          <button onClick={async()=>{
+            flash("Cargando datos...");
+            const clockins=await DB.getClockIns(exportFrom,exportTo);
+            const fullRecs={...records};
+            clockins.forEach(r=>{const dk=dateKey(new Date(r.time));if(!fullRecs[dk])fullRecs[dk]=[];if(!fullRecs[dk].find(x=>x.id===r.id))fullRecs[dk].push(r);});
+            setRecords(fullRecs);
+            const csv=generateReport(employees,fullRecs,schedules,vacations,documents,exportFrom,exportTo);
+            const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`ARESO_${exportFrom}_${exportTo}.csv`;a.click();
+            flash("Descargado ✓");
+          }} style={ss.btn(C.accent,"#000")}>📥 Descargar informe</button>
         </div>
       </div>}
 
@@ -1094,21 +1116,26 @@ export default function App(){
 
     {/* MIS FICHAJES empleado */}
     {sub==="misfichajes"&&(()=>{
-      const myClockIns=Object.values(records).flat().filter(r=>r.empId===user.id).sort((a,b)=>a.time-b.time);
+      if(!myClockInsData)return(<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}>
+        <button onClick={goHome} style={ss.back}>← Menú</button>
+        <div style={{textAlign:"center",padding:40,fontFamily:font,fontSize:13,color:C.muted}}>Cargando...</div>
+      </div>);
+      const myClockIns=myClockInsData.sort((a,b)=>a.time-b.time);
       const now=new Date();
-      // Weekly hours
       const weekStart=new Date(now);const wd=weekStart.getDay()||7;weekStart.setDate(weekStart.getDate()-(wd-1));weekStart.setHours(0,0,0,0);
       const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
       let weekMs=0,monthMs=0;
-      const dayKeys=[...new Set(myClockIns.map(r=>dateKey(new Date(r.time))))];
-      dayKeys.forEach(dk=>{
-        const w=getWorked(records,user.id,dk);
+      const byDate={};myClockIns.forEach(r=>{const dk=dateKey(new Date(r.time));if(!byDate[dk])byDate[dk]=[];byDate[dk].push(r);});
+      Object.keys(byDate).forEach(dk=>{
+        let ms=0,li=null;
+        byDate[dk].sort((a,b)=>a.time-b.time).forEach(r=>{if(r.type==="in")li=r.time;else if(r.type==="out"&&li){ms+=r.time-li;li=null;}});
+        if(li)ms+=Date.now()-li;
         const d=new Date(dk);
-        if(d>=weekStart)weekMs+=w;
-        if(d>=monthStart)monthMs+=w;
+        if(d>=weekStart)weekMs+=ms;
+        if(d>=monthStart)monthMs+=ms;
       });
       // Group by date
-      const byDate={};myClockIns.forEach(r=>{const dk=dateKey(new Date(r.time));if(!byDate[dk])byDate[dk]=[];byDate[dk].push(r);});
+      const byDate2={};myClockIns.forEach(r=>{const dk=dateKey(new Date(r.time));if(!byDate2[dk])byDate2[dk]=[];byDate2[dk].push(r);});
       return(<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}>
         <button onClick={goHome} style={ss.back}>← Menú</button>
         <div style={{fontSize:20,fontWeight:700}}>Mis fichajes</div>
@@ -1122,13 +1149,13 @@ export default function App(){
             <div style={{fontFamily:font,fontSize:22,fontWeight:700,color:C.green}}>{fmtDur(monthMs)}</div>
           </div>
         </div>
-        {Object.keys(byDate).sort((a,b)=>b.localeCompare(a)).map(dk=>{
-          const recs=byDate[dk].sort((a,b)=>a.time-b.time);
-          const worked=getWorked(records,user.id,dk);
+        {Object.keys(byDate2).sort((a,b)=>b.localeCompare(a)).map(dk=>{
+          const recs=byDate2[dk].sort((a,b)=>a.time-b.time);
+          let ms=0,li=null;recs.forEach(r=>{if(r.type==="in")li=r.time;else if(r.type==="out"&&li){ms+=r.time-li;li=null;}});if(li)ms+=Date.now()-li;
           return(<div key={dk} style={ss.card}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
               <div style={{fontFamily:font,fontSize:13,fontWeight:700,textTransform:"capitalize"}}>{fmtDateLong(new Date(dk))}</div>
-              {worked>0&&<div style={{fontFamily:font,fontSize:12,fontWeight:700,color:C.accent}}>{fmtDur(worked)}</div>}
+              {ms>0&&<div style={{fontFamily:font,fontSize:12,fontWeight:700,color:C.accent}}>{fmtDur(ms)}</div>}
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {recs.map(r=><div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",borderRadius:8,background:r.type==="in"?C.green+"0d":C.red+"0d"}}>
@@ -1139,7 +1166,7 @@ export default function App(){
             </div>
           </div>);
         })}
-        {Object.keys(byDate).length===0&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin fichajes registrados</div>}
+        {Object.keys(byDate2).length===0&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin fichajes registrados</div>}
       </div>);
     })()}
 
@@ -1227,7 +1254,7 @@ export default function App(){
         </div>
         <div style={ss.secTitle}>Mi actividad</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr",gap:10}}>
-          <div style={ss.moduleCard} onClick={()=>setSub("misfichajes")}>{Ic.clock}<span style={{fontSize:14,fontWeight:600}}>Mis fichajes</span></div>
+          <div style={ss.moduleCard} onClick={async()=>{setMyClockInsData(null);setSub("misfichajes");const data=await DB.getMyClockIns(user.id);setMyClockInsData(data);}}>{Ic.clock}<span style={{fontSize:14,fontWeight:600}}>Mis fichajes</span></div>
         </div>
         <div style={ss.secTitle}>Solicitudes</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
