@@ -377,7 +377,7 @@ export default function App(){
         <button onClick={()=>loadData()} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.accent,cursor:"pointer",fontFamily:font,fontSize:11}}>↻ Actualizar</button>
         <button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button>
       </div></div>
-      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>{setAdminTab(t.id);setAddShift(null);setConfirmDelete(null);if(t.id==="records"){const d=new Date();d.setDate(d.getDate()-7);loadClockIns(dateKey(d),dateKey());}if(t.id==="export"){const d=new Date();d.setMonth(d.getMonth()-1);loadClockIns(dateKey(d),dateKey());}if(t.id==="audit"){DB.getAudit().then(setAuditLog);}}} style={{padding:"10px 18px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:font,fontSize:13,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#fff":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
+      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>{setAdminTab(t.id);setAddShift(null);setConfirmDelete(null);if(t.id==="records"){const d=new Date();d.setDate(d.getDate()-7);loadClockIns(dateKey(d),dateKey());}if(t.id==="export"){const d=new Date();d.setMonth(d.getMonth()-1);loadClockIns(dateKey(d),dateKey());}if(t.id==="audit"){DB.getAudit().then(setAuditLog).catch(()=>setAuditLog([]));}}} style={{padding:"10px 18px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:font,fontSize:13,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#fff":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
 
       {/* LIVE */}
       {adminTab==="live"&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -1364,4 +1364,4 @@ export default function App(){
     <button style={{...ss.navBtn(false),color:C.red}} onClick={()=>{setUser(null);setView("login");stopCamera();setPhoto(null);}}>{Ic.logout}<span>Salir</span></button>
   </div>
   </div>);
-}s
+}
