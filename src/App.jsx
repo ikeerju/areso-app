@@ -23,6 +23,10 @@ const DB = {
   async getVacations() { const {data}=await sb.from('areso_vacations').select('*').order('id',{ascending:false}); return (data||[]).map(v=>({id:v.id,empId:v.employee_id,start:v.start_date,end:v.end_date,status:v.status,notes:v.notes})); },
   async addVacation(vac) { await sb.from('areso_vacations').insert({employee_id:vac.empId,start_date:vac.start,end_date:vac.end,status:'pending',notes:vac.notes}); },
   async updateVacation(id,status) { await sb.from('areso_vacations').update({status}).eq('id',id); },
+  async updateVacationDates(id,start,end) { await sb.from('areso_vacations').update({start_date:start,end_date:end}).eq('id',id); },
+  async deleteVacation(id) { await sb.from('areso_vacations').delete().eq('id',id); },
+  async addAudit(entry) { await sb.from('areso_audit').insert({action:entry.action,entity:entry.entity,details:entry.details,actor:entry.actor||'admin'}); },
+  async getAudit() { const {data}=await sb.from('areso_audit').select('*').order('created_at',{ascending:false}).limit(200); return (data||[]).map(a=>({id:a.id,action:a.action,entity:a.entity,details:a.details,actor:a.actor,createdAt:a.created_at})); },
   async getDocuments() { const {data}=await sb.from('areso_documents').select('*').order('id',{ascending:false}); return (data||[]).map(d=>({id:d.id,empId:d.employee_id,type:d.type,file:d.file_url,notes:d.notes,date:d.date})); },
   async addDocument(doc) { await sb.from('areso_documents').insert({employee_id:doc.empId,type:doc.type,file_url:doc.file,notes:doc.notes}); },
   async getAnnouncements() { const {data}=await sb.from('areso_announcements').select('*').order('date',{ascending:false}); return (data||[]).map(a=>({id:a.id,title:a.title,body:a.body,date:new Date(a.date).getTime(),readBy:a.read_by||[]})); },
@@ -201,6 +205,8 @@ export default function App(){
   const [incForm,setIncForm]=useState({dateRef:"",timeRef:"",description:""});
   const [replyForm,setReplyForm]=useState({});
   const [myClockInsData,setMyClockInsData]=useState(null);
+  const [auditLog,setAuditLog]=useState([]);
+  const [editVac,setEditVac]=useState(null);
 
   // Load all data from Supabase on mount
   const loadData=useCallback(async()=>{
@@ -230,6 +236,8 @@ export default function App(){
     clockins.forEach(r=>{const dk=dateKey(new Date(r.time));if(!recs[dk])recs[dk]=[];if(!recs[dk].find(x=>x.id===r.id))recs[dk].push(r);});
     setRecords(recs);
   },[records]);
+
+  const logAudit=async(action,entity,details)=>{try{await DB.addAudit({action,entity,details});}catch(e){console.error(e);}};
 
   const flash=(msg,ok=true)=>{setToast({msg,ok});setTimeout(()=>setToast(null),2000);};
   const startCamera=async()=>{try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});streamRef.current=s;setCameraOn(true);setTimeout(()=>{if(videoRef.current)videoRef.current.srcObject=s;},100);}catch{flash("Cámara no disponible",false);}};
@@ -361,7 +369,7 @@ export default function App(){
 
   // ═══ ADMIN PANEL ═══
   if(view==="admin"){
-    const tabs=[{id:"live",l:"📡 Directo"},{id:"schedule",l:"📅 Horarios"},{id:"overview",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"incidencias",l:"📬 Buzón"},{id:"export",l:"📥 Exportar"},{id:"guia",l:"📖 Guía"}];
+    const tabs=[{id:"live",l:"📡 Directo"},{id:"schedule",l:"📅 Horarios"},{id:"overview",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"incidencias",l:"📬 Buzón"},{id:"audit",l:"🔍 Auditoría"},{id:"export",l:"📥 Exportar"},{id:"guia",l:"📖 Guía"}];
 
     return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px 32px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div>
@@ -369,7 +377,7 @@ export default function App(){
         <button onClick={()=>loadData()} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.accent,cursor:"pointer",fontFamily:font,fontSize:11}}>↻ Actualizar</button>
         <button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button>
       </div></div>
-      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>{setAdminTab(t.id);setAddShift(null);setConfirmDelete(null);if(t.id==="records"){const d=new Date();d.setDate(d.getDate()-7);loadClockIns(dateKey(d),dateKey());}if(t.id==="export"){const d=new Date();d.setMonth(d.getMonth()-1);loadClockIns(dateKey(d),dateKey());}}} style={{padding:"10px 18px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:font,fontSize:13,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#fff":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
+      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>{setAdminTab(t.id);setAddShift(null);setConfirmDelete(null);if(t.id==="records"){const d=new Date();d.setDate(d.getDate()-7);loadClockIns(dateKey(d),dateKey());}if(t.id==="export"){const d=new Date();d.setMonth(d.getMonth()-1);loadClockIns(dateKey(d),dateKey());}if(t.id==="audit"){DB.getAudit().then(setAuditLog);}}} style={{padding:"10px 18px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:font,fontSize:13,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#fff":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
 
       {/* LIVE */}
       {adminTab==="live"&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -418,6 +426,8 @@ export default function App(){
             const dt=new Date(date);dt.setHours(+h,+m,0,0);
             const rec={empId,type,time:dt.getTime(),photo:null};
             await DB.addClockIn(rec);
+            const empName=employees.find(e=>e.id===empId)?.name||"?";
+            await logAudit("Fichaje añadido","Fichajes",`${empName} - ${type==="in"?"Entrada":"Salida"} ${dateKey(dt)} ${time}`);
             const dk=dateKey(dt);
             setRecords({...records,[dk]:[...(records[dk]||[]),{...rec,id:Date.now()}]});
             flash(`Fichaje añadido ✓`);loadData();
@@ -446,8 +456,8 @@ export default function App(){
                   <div style={{fontFamily:font,fontSize:13,fontWeight:600,color:r.type==="in"?C.green:C.red,minWidth:60}}>{r.type==="in"?"Entrada":"Salida"}</div>
                   <div style={{fontFamily:font,fontSize:14,fontWeight:700,flex:1}}>{fmtTime(r.time)}</div>
                   <button onClick={()=>{setEditRecId(editRecId===r.id?null:r.id);setEditTimeVal("");}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:13,padding:"4px"}}>✎</button>
-                  <button onClick={async()=>{await DB.deleteClockIn(r.id);setRecords({...records,[filterDate]:(records[filterDate]||[]).filter(x=>x.id!==r.id)});flash("Eliminado");}} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontSize:13,padding:"4px"}}>✕</button>
-                  {editRecId===r.id&&<div style={{display:"flex",gap:6,marginLeft:8}}><input type="time" value={editTimeVal} onChange={e=>setEditTimeVal(e.target.value)} style={{...ss.input,width:100}}/><button onClick={async()=>{if(!editTimeVal)return;const[h,m]=editTimeVal.split(":");const d=new Date(r.time);d.setHours(+h,+m,0);await DB.updateClockIn(r.id,d.getTime());setRecords({...records,[filterDate]:(records[filterDate]||[]).map(x=>x.id!==r.id?x:{...x,time:d.getTime()})});setEditRecId(null);flash("Actualizado");}} style={{background:C.accent,border:"none",color:"#fff",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontFamily:font,fontSize:11,fontWeight:700,flexShrink:0}}>✓</button></div>}
+                  <button onClick={async()=>{await DB.deleteClockIn(r.id);await logAudit("Fichaje borrado","Fichajes",`${emp?.name||"?"} - ${r.type==="in"?"Entrada":"Salida"} ${fmtTime(r.time)} (${filterDate})`);setRecords({...records,[filterDate]:(records[filterDate]||[]).filter(x=>x.id!==r.id)});flash("Eliminado");}} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontSize:13,padding:"4px"}}>✕</button>
+                  {editRecId===r.id&&<div style={{display:"flex",gap:6,marginLeft:8}}><input type="time" value={editTimeVal} onChange={e=>setEditTimeVal(e.target.value)} style={{...ss.input,width:100}}/><button onClick={async()=>{if(!editTimeVal)return;const[h,m]=editTimeVal.split(":");const d=new Date(r.time);const oldTime=fmtTime(r.time);d.setHours(+h,+m,0);await DB.updateClockIn(r.id,d.getTime());await logAudit("Fichaje editado","Fichajes",`${emp?.name||"?"} - ${oldTime} → ${editTimeVal} (${filterDate})`);setRecords({...records,[filterDate]:(records[filterDate]||[]).map(x=>x.id!==r.id?x:{...x,time:d.getTime()})});setEditRecId(null);flash("Actualizado");}} style={{background:C.accent,border:"none",color:"#fff",borderRadius:8,padding:"6px 10px",cursor:"pointer",fontFamily:font,fontSize:11,fontWeight:700,flexShrink:0}}>✓</button></div>}
                 </div>)}
               </div>
             </div>);
@@ -838,14 +848,41 @@ export default function App(){
             const status=document.getElementById("vac-status").value;
             if(!empId||!start||!end)return flash("Rellena todos los campos",false);
             await DB.addVacation({empId,start,end,notes:"Añadido por admin"});
+            const empName=employees.find(e=>e.id===empId)?.name||"?";
             if(status==="approved"){const {data}=await sb.from('areso_vacations').select('id').eq('employee_id',empId).eq('start_date',start).order('id',{ascending:false}).limit(1);if(data?.[0])await DB.updateVacation(data[0].id,"approved");}
+            await logAudit("Vacación añadida (admin)","Vacaciones",`${empName} - ${start} → ${end} (${status==="approved"?"Aprobada":"Pendiente"})`);
             document.getElementById("vac-emp-sel").value="";document.getElementById("vac-start").value="";document.getElementById("vac-end").value="";
             flash("Vacaciones añadidas ✓");loadData();
           }} style={ss.btn(C.accent,"#fff")}>+ Añadir vacaciones</button>
         </div>
         {vacations.sort((a,b)=>b.id-a.id).map(v=>{const emp=employees.find(e=>e.id===v.empId);const cc={pending:{bg:"#fefce8",c:C.accent},approved:{bg:"#f0fdf4",c:C.green},rejected:{bg:"#fef2f2",c:C.red}}[v.status];return(<div key={v.id} style={{...ss.card,display:"flex",flexDirection:"column",gap:8}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontWeight:600}}>{emp?.name?.split(" ")[0]}</span><span style={{fontFamily:font,fontSize:12}}>{fmtDate(v.start)} → {fmtDate(v.end)}</span><span style={{marginLeft:"auto",fontFamily:font,fontSize:9,fontWeight:700,padding:"3px 8px",borderRadius:6,background:cc.bg,color:cc.c}}>{v.status==="pending"?"PENDIENTE":v.status==="approved"?"APROBADA":"RECHAZADA"}</span></div>
-          {v.status==="pending"&&<div style={{display:"flex",gap:6}}><button onClick={async()=>{await DB.updateVacation(v.id,"approved");setVacations(vacations.map(x=>x.id===v.id?{...x,status:"approved"}:x));flash("Aprobada");}} style={{...ss.btn(C.green,"#000"),padding:"8px",fontSize:12}}>✓</button><button onClick={async()=>{await DB.updateVacation(v.id,"rejected");setVacations(vacations.map(x=>x.id===v.id?{...x,status:"rejected"}:x));flash("Rechazada");}} style={{...ss.btn(C.red,"#000"),padding:"8px",fontSize:12}}>✕</button></div>}
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span style={{fontWeight:600}}>{emp?.name?.split(" ")[0]}</span>
+            {editVac===v.id?<div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <input type="date" defaultValue={v.start} id={`vac-edit-start-${v.id}`} style={{...ss.input,fontSize:11,padding:"4px 8px",width:130}}/>
+              <span>→</span>
+              <input type="date" defaultValue={v.end} id={`vac-edit-end-${v.id}`} style={{...ss.input,fontSize:11,padding:"4px 8px",width:130}}/>
+            </div>:<span style={{fontFamily:font,fontSize:12}}>{fmtDate(v.start)} → {fmtDate(v.end)}</span>}
+            <span style={{marginLeft:"auto",fontFamily:font,fontSize:9,fontWeight:700,padding:"3px 8px",borderRadius:6,background:cc.bg,color:cc.c}}>{v.status==="pending"?"PENDIENTE":v.status==="approved"?"APROBADA":"RECHAZADA"}</span>
+          </div>
+          {v.status==="pending"&&<div style={{display:"flex",gap:6}}><button onClick={async()=>{await DB.updateVacation(v.id,"approved");await logAudit("Vacación aprobada","Vacaciones",`${emp?.name||"?"} - ${fmtDate(v.start)} → ${fmtDate(v.end)}`);setVacations(vacations.map(x=>x.id===v.id?{...x,status:"approved"}:x));flash("Aprobada");}} style={{...ss.btn(C.green,"#000"),padding:"8px",fontSize:12}}>✓</button><button onClick={async()=>{await DB.updateVacation(v.id,"rejected");await logAudit("Vacación rechazada","Vacaciones",`${emp?.name||"?"} - ${fmtDate(v.start)} → ${fmtDate(v.end)}`);setVacations(vacations.map(x=>x.id===v.id?{...x,status:"rejected"}:x));flash("Rechazada");}} style={{...ss.btn(C.red,"#000"),padding:"8px",fontSize:12}}>✕</button></div>}
+          <div style={{display:"flex",gap:6}}>
+            {editVac===v.id?<>
+              <button onClick={async()=>{
+                const newStart=document.getElementById(`vac-edit-start-${v.id}`).value;
+                const newEnd=document.getElementById(`vac-edit-end-${v.id}`).value;
+                if(!newStart||!newEnd)return flash("Fechas requeridas",false);
+                await DB.updateVacationDates(v.id,newStart,newEnd);
+                await logAudit("Vacación editada","Vacaciones",`${emp?.name||"?"} - ${fmtDate(v.start)}→${fmtDate(v.end)} cambiado a ${fmtDate(newStart)}→${fmtDate(newEnd)}`);
+                setVacations(vacations.map(x=>x.id===v.id?{...x,start:newStart,end:newEnd}:x));
+                setEditVac(null);flash("Vacación actualizada ✓");
+              }} style={{...ss.btn(C.accent,"#fff"),padding:"6px",fontSize:11,flex:1}}>✓ Guardar</button>
+              <button onClick={()=>setEditVac(null)} style={{...ss.btn(C.cardLight,C.muted),padding:"6px",fontSize:11,flex:1,border:`1px solid ${C.border}`}}>Cancelar</button>
+            </>:<>
+              <button onClick={()=>setEditVac(v.id)} style={{...ss.btn(C.cardLight,C.accent),padding:"6px",fontSize:11,flex:1,border:`1px solid ${C.border}`}}>✎ Editar fechas</button>
+              <button onClick={async()=>{if(!window.confirm("¿Borrar esta vacación?"))return;await DB.deleteVacation(v.id);await logAudit("Vacación eliminada","Vacaciones",`${emp?.name||"?"} - ${fmtDate(v.start)} → ${fmtDate(v.end)}`);setVacations(vacations.filter(x=>x.id!==v.id));flash("Vacación eliminada");}} style={{...ss.btn(C.cardLight,C.red),padding:"6px",fontSize:11,flex:1,border:`1px solid ${C.border}`}}>🗑 Borrar</button>
+            </>}
+          </div>
         </div>);})}
         {!vacations.length&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin solicitudes</div>}
       </div>}
@@ -879,6 +916,27 @@ export default function App(){
               <input placeholder="Responder..." value={replyForm[inc.id]||""} onChange={e=>setReplyForm({...replyForm,[inc.id]:e.target.value})} style={{...ss.input,flex:1,fontSize:12}}/>
               <button onClick={async()=>{const reply=replyForm[inc.id];if(!reply)return;await DB.replyIncidencia(inc.id,reply);setReplyForm({...replyForm,[inc.id]:""});flash("Respuesta enviada ✓");loadData();}} style={{background:C.accent,border:"none",color:"#fff",borderRadius:10,padding:"8px 14px",cursor:"pointer",fontFamily:font,fontSize:12,fontWeight:700,flexShrink:0}}>Enviar</button>
             </div>}
+          </div>);
+        })}
+      </div>}
+
+      {adminTab==="audit"&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{fontFamily:font,fontSize:11,color:C.muted,marginBottom:4}}>Registro de cambios manuales — fichajes y vacaciones modificados</div>
+        {auditLog.length===0&&<div style={{textAlign:"center",padding:20,fontFamily:font,fontSize:12,color:C.dim}}>Sin registros de auditoría</div>}
+        {auditLog.map(a=>{
+          const isVac=a.entity==="Vacaciones";
+          const isDelete=a.action.includes("borrado")||a.action.includes("eliminada");
+          const col=isDelete?C.red:isVac?C.purple:C.accent;
+          return(<div key={a.id} style={{...ss.card,padding:"12px 14px",display:"flex",gap:10,alignItems:"flex-start"}}>
+            <div style={{width:8,height:8,borderRadius:"50%",background:col,marginTop:5,flexShrink:0}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <span style={{fontFamily:font,fontSize:12,fontWeight:700,color:col}}>{a.action}</span>
+                <span style={{fontFamily:font,fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:5,background:isVac?C.purple+"15":C.accent+"15",color:isVac?C.purple:C.accent}}>{a.entity}</span>
+              </div>
+              <div style={{fontFamily:font,fontSize:12,color:C.text,marginTop:3}}>{a.details}</div>
+              <div style={{fontFamily:font,fontSize:9,color:C.dim,marginTop:4}}>{new Date(a.createdAt).toLocaleString("es-ES",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
+            </div>
           </div>);
         })}
       </div>}
@@ -1306,4 +1364,4 @@ export default function App(){
     <button style={{...ss.navBtn(false),color:C.red}} onClick={()=>{setUser(null);setView("login");stopCamera();setPhoto(null);}}>{Ic.logout}<span>Salir</span></button>
   </div>
   </div>);
-}
+}s
