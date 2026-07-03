@@ -224,6 +224,8 @@ export default function App(){
       const todayRecs=await DB.getClockIns(dateKey(),dateKey());
       const recs={};todayRecs.forEach(r=>{const dk=dateKey(new Date(r.time));if(!recs[dk])recs[dk]=[];recs[dk].push(r);});
       setRecords(recs);
+      // Auto-close any open shifts older than 14h
+      await autoCloseOpenShifts(emps,scheds,recs);
     }catch(e){console.error("Error loading data:",e);}
     setLoading(false);
   },[]);
@@ -239,6 +241,34 @@ export default function App(){
 
   const logAudit=async(action,entity,details)=>{try{await DB.addAudit({action,entity,details});}catch(e){console.error(e);}};
 
+  // Auto-close open fichajes older than 14 hours
+  const autoCloseOpenShifts=useCallback(async(emps,scheds,recs)=>{
+    const now=Date.now();const LIMIT=14*3600000;
+    for(const emp of emps){
+      const todayRecs=(recs[dateKey()]||[]).filter(r=>r.empId===emp.id).sort((a,b)=>a.time-b.time);
+      const lastRec=todayRecs[todayRecs.length-1];
+      if(!lastRec||lastRec.type!=="in")continue;
+      if(now-lastRec.time<LIMIT)continue;
+      const raw=scheds[emp.id+"_"+dateKey()];
+      const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+      const lastShift=shifts[shifts.length-1];
+      let closeTime;
+      if(lastShift?.end){const [h,m]=lastShift.end.split(":").map(Number);const t=new Date(dateKey());t.setHours(h,m,0,0);closeTime=t.getTime();if(closeTime<=lastRec.time)closeTime=lastRec.time+8*3600000;}
+      else{closeTime=lastRec.time+8*3600000;}
+      if(closeTime>now)closeTime=now;
+      await DB.addClockIn({empId:emp.id,type:"out",time:closeTime,photo:null});
+      await logAudit("Salida auto-registrada","Fichajes",`${emp.name} - ${new Date(closeTime).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})} (fichaje abierto >14h)`);
+    }
+  },[]);
+
+  // Check for app updates
+  const [updateAvailable,setUpdateAvailable]=useState(false);
+  useEffect(()=>{
+    const BUILD_ID="BUILD_"+new Date().toISOString().slice(0,10).replace(/-/g,"");
+    const stored=localStorage.getItem("areso_build");
+    if(stored&&stored!==BUILD_ID)setUpdateAvailable(true);
+    else localStorage.setItem("areso_build",BUILD_ID);
+  },[]);
   const flash=(msg,ok=true)=>{setToast({msg,ok});setTimeout(()=>setToast(null),2000);};
   const startCamera=async()=>{try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});streamRef.current=s;setCameraOn(true);setTimeout(()=>{if(videoRef.current)videoRef.current.srcObject=s;},100);}catch{flash("Cámara no disponible",false);}};
   const stopCamera=()=>{if(streamRef.current){streamRef.current.getTracks().forEach(t=>t.stop());streamRef.current=null;}setCameraOn(false);};
@@ -371,7 +401,11 @@ export default function App(){
   if(view==="admin"){
     const tabs=[{id:"live",l:"📡 Directo"},{id:"schedule",l:"📅 Horarios"},{id:"overview",l:"📆 Calendario"},{id:"records",l:"⏱ Fichajes"},{id:"employees",l:"👥 Equipo"},{id:"announcements",l:"📢 Comunicados"},{id:"vacations",l:"🏖 Vacaciones"},{id:"incidencias",l:"📬 Buzón"},{id:"audit",l:"🔍 Auditoría"},{id:"export",l:"📥 Exportar"},{id:"guia",l:"📖 Guía"}];
 
-    return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}<div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px 32px"}}>
+    return(<div style={{...ss.page,paddingBottom:16}}>{CSS}{Toast}
+      {updateAvailable&&<div style={{background:"#1e40af",color:"#fff",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,position:"sticky",top:0,zIndex:200}}>
+        <span style={{fontFamily:font,fontSize:13,fontWeight:600}}>🔄 Hay una nueva versión de ARESO disponible</span>
+        <button onClick={()=>{localStorage.setItem("areso_build","BUILD_"+new Date().toISOString().slice(0,10).replace(/-/g,""));window.location.reload();}} style={{background:"#fff",color:"#1e40af",border:"none",borderRadius:8,padding:"6px 14px",cursor:"pointer",fontFamily:font,fontSize:12,fontWeight:700,flexShrink:0}}>Actualizar ahora</button>
+      </div>}<div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px 32px"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10}}><AresoLogo size={32} color={C.accent}/><div><div style={{fontFamily:font,fontSize:10,color:C.accent,letterSpacing:3}}>ARESO ADMIN</div><div style={{fontSize:20,fontWeight:700}}>Panel de gestión</div></div></div>
       <div style={{display:"flex",gap:8}}>
         <button onClick={()=>loadData()} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.accent,cursor:"pointer",fontFamily:font,fontSize:11}}>↻ Actualizar</button>
@@ -1034,7 +1068,12 @@ export default function App(){
   const nextSched=getNextSched(schedules,user.id);
   const bdays=getUpcomingBirthdays(employees);
 
-  return(<div style={ss.page}>{CSS}{Toast}<div style={{maxWidth:720,margin:"0 auto"}}>
+  return(<div style={ss.page}>{CSS}{Toast}
+    {updateAvailable&&<div style={{background:"#1e40af",color:"#fff",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+      <span style={{fontFamily:font,fontSize:12,fontWeight:600}}>🔄 Nueva versión disponible</span>
+      <button onClick={()=>{localStorage.setItem("areso_build","BUILD_"+new Date().toISOString().slice(0,10).replace(/-/g,""));window.location.reload();}} style={{background:"#fff",color:"#1e40af",border:"none",borderRadius:8,padding:"5px 12px",cursor:"pointer",fontFamily:font,fontSize:11,fontWeight:700,flexShrink:0}}>Actualizar</button>
+    </div>}
+    <div style={{maxWidth:720,margin:"0 auto"}}>
 
 
     {/* HORARIOS empleado */}
