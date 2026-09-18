@@ -660,37 +660,6 @@ export default function App(){
               <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:14,fontWeight:700}}>{weekDays[0].num} {weekDays[0].month} — {weekDays[6].num} {weekDays[6].month}</div>
               <button onClick={()=>shiftWeek(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>→</button>
               <button onClick={()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));setCalWeekStart(dateKey(n));}} style={{...ss.btn(C.cardLight,C.accent),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>Hoy</button>
-              <button onClick={()=>{
-                // Copy current week
-                const data={};
-                activeEmps.forEach(emp=>{
-                  weekDays.forEach((d,i)=>{
-                    const raw=schedules[emp.id+"_"+d.date];
-                    const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
-                    if(shifts.length>0) data[emp.id+"_"+i]=shifts;
-                  });
-                });
-                setCopiedWeek({weekStart:calWeekStart,data});
-                flash(`Semana copiada ✓`);
-              }} style={{...ss.btn(C.cardLight,C.purple),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>📋 Copiar</button>
-              {copiedWeek&&<button onClick={async()=>{
-                // Paste copied week into current week
-                const ns={...schedules};let count=0;
-                for(const key of Object.keys(copiedWeek.data)){
-                  const [empId,dayOffset]=key.split("_");
-                  const targetDay=weekDays[parseInt(dayOffset)];
-                  if(!targetDay)continue;
-                  const shifts=copiedWeek.data[key];
-                  await DB.deleteSchedule(empId,targetDay.date);
-                  for(let si=0;si<shifts.length;si++){
-                    await DB.setSchedule(empId,targetDay.date,shifts[si].start,shifts[si].end,si);
-                  }
-                  ns[empId+"_"+targetDay.date]=shifts;
-                  count++;
-                }
-                setSchedules(ns);
-                flash(`Semana pegada (${count} turnos) ✓`);
-              }} style={{...ss.btn(C.purple,"#fff"),width:"auto",border:"none",padding:"8px 10px",fontSize:11,flexShrink:0}}>📋 Pegar aquí</button>}
               <button onClick={async()=>{
                 const wDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);wDays.push(dateKey(d));}
                 const y=new Date(calWeekStart).getFullYear();const m=new Date(calWeekStart).getMonth();
@@ -713,6 +682,28 @@ export default function App(){
                 <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:`1px solid ${C.border}`,background:C.cardLight}}>
                   <div style={ss.avatar(col,32)}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
                   <div style={{flex:1}}><div style={{fontFamily:font,fontSize:14,fontWeight:700}}>{emp.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>{emp.position||"—"}</div></div>
+                  <button onClick={()=>{
+                    const data={};
+                    weekDays.forEach((d,i)=>{
+                      const raw=schedules[emp.id+"_"+d.date];
+                      const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+                      if(shifts.length>0)data[i]=shifts;
+                    });
+                    setCopiedWeek({empId:emp.id,empName:emp.name.split(" ")[0],data});
+                    flash(`Semana de ${emp.name.split(" ")[0]} copiada ✓`);
+                  }} style={{fontFamily:font,fontSize:10,padding:"4px 10px",borderRadius:7,border:`1px solid ${C.border}`,background:C.cardLight,color:C.purple,cursor:"pointer",fontWeight:700}}>📋 Copiar</button>
+                  {copiedWeek&&<button onClick={async()=>{
+                    const ns={...schedules};let count=0;
+                    for(const [dayOffset,shifts] of Object.entries(copiedWeek.data)){
+                      const targetDay=weekDays[parseInt(dayOffset)];
+                      if(!targetDay)continue;
+                      await DB.deleteSchedule(emp.id,targetDay.date);
+                      for(let si=0;si<shifts.length;si++){await DB.setSchedule(emp.id,targetDay.date,shifts[si].start,shifts[si].end,si);}
+                      ns[emp.id+"_"+targetDay.date]=shifts;count++;
+                    }
+                    setSchedules(ns);
+                    flash(`Pegado en ${emp.name.split(" ")[0]} ✓`);
+                  }} style={{fontFamily:font,fontSize:10,padding:"4px 10px",borderRadius:7,border:"none",background:C.purple,color:"#fff",cursor:"pointer",fontWeight:700}}>📋 Pegar</button>}
                 </div>
                 <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(56px,1fr))",minWidth:392}}>
