@@ -275,6 +275,7 @@ export default function App(){
   const [editSched,setEditSched]=useState(null);
   const [calWeekStart,setCalWeekStart]=useState(()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));return dateKey(n);});
   const [calWeekStart2,setCalWeekStart2]=useState(()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));return dateKey(n);});
+  const [copiedWeek,setCopiedWeek]=useState(null); // {weekStart, data: {empId_dayOffset: shifts[]}}
   const [addShift,setAddShift]=useState(null);
   const [confirmDelete,setConfirmDelete]=useState(null);
   const [shiftForm,setShiftForm]=useState({start:"09:00",end:"17:00"});
@@ -659,6 +660,37 @@ export default function App(){
               <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:14,fontWeight:700}}>{weekDays[0].num} {weekDays[0].month} — {weekDays[6].num} {weekDays[6].month}</div>
               <button onClick={()=>shiftWeek(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>→</button>
               <button onClick={()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));setCalWeekStart(dateKey(n));}} style={{...ss.btn(C.cardLight,C.accent),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>Hoy</button>
+              <button onClick={()=>{
+                // Copy current week
+                const data={};
+                activeEmps.forEach(emp=>{
+                  weekDays.forEach((d,i)=>{
+                    const raw=schedules[emp.id+"_"+d.date];
+                    const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
+                    if(shifts.length>0) data[emp.id+"_"+i]=shifts;
+                  });
+                });
+                setCopiedWeek({weekStart:calWeekStart,data});
+                flash(`Semana copiada ✓`);
+              }} style={{...ss.btn(C.cardLight,C.purple),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>📋 Copiar</button>
+              {copiedWeek&&<button onClick={async()=>{
+                // Paste copied week into current week
+                const ns={...schedules};let count=0;
+                for(const key of Object.keys(copiedWeek.data)){
+                  const [empId,dayOffset]=key.split("_");
+                  const targetDay=weekDays[parseInt(dayOffset)];
+                  if(!targetDay)continue;
+                  const shifts=copiedWeek.data[key];
+                  await DB.deleteSchedule(empId,targetDay.date);
+                  for(let si=0;si<shifts.length;si++){
+                    await DB.setSchedule(empId,targetDay.date,shifts[si].start,shifts[si].end,si);
+                  }
+                  ns[empId+"_"+targetDay.date]=shifts;
+                  count++;
+                }
+                setSchedules(ns);
+                flash(`Semana pegada (${count} turnos) ✓`);
+              }} style={{...ss.btn(C.purple,"#fff"),width:"auto",border:"none",padding:"8px 10px",fontSize:11,flexShrink:0}}>📋 Pegar aquí</button>}
               <button onClick={async()=>{
                 const wDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);wDays.push(dateKey(d));}
                 const y=new Date(calWeekStart).getFullYear();const m=new Date(calWeekStart).getMonth();
