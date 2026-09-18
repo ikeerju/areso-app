@@ -1,9 +1,75 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { createClient } from '@supabase/supabase-js';
+const PG_URL = 'https://postgrest-production-5a2d.up.railway.app';
+const pgHeaders = {'Content-Type':'application/json','Accept':'application/json','Prefer':'return=representation'};
 
-const SUPABASE_URL = 'https://uyodcfxggvojltmsugyq.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5b2RjZnhnZ3Zvamx0bXN1Z3lxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2OTI0MzUsImV4cCI6MjA5MjI2ODQzNX0.5uh7JQKLpRvEVmTfxmQWHpdJQndLNvdFkloA4-N7OXA';
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const pgFetch = async (table, method='GET', filters={}, body=null) => {
+  let url = `${PG_URL}/${table}`;
+  const params = Object.entries(filters).map(([k,v])=>`${k}=eq.${v}`);
+  if(params.length) url += '?' + params.join('&');
+  const opts = {method, headers:pgHeaders};
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  if(!r.ok) { console.error('pgFetch error', method, table, await r.text()); return null; }
+  if(r.status===204||method==='DELETE'||method==='PATCH') return null;
+  return r.json().catch(()=>null);
+};
+
+const pgSelect = async (table, filters={}, order=null, extra='') => {
+  let url = `${PG_URL}/${table}?select=*`;
+  Object.entries(filters).forEach(([k,v])=>{ url += `&${k}=eq.${v}`; });
+  if(order) url += `&order=${order}`;
+  if(extra) url += `&${extra}`;
+  const r = await fetch(url, {headers:pgHeaders});
+  if(!r.ok) return [];
+  return r.json().catch(()=>[]);
+};
+
+const sb = {
+  from: (table) => {
+    let _filters = {};
+    let _order = null;
+    let _extra = '';
+    let _select = '*';
+    const obj = {
+      select: (s='*') => { _select=s; return obj; },
+      order: (col,opts={}) => { _order=`${col}.${opts.ascending===false?'desc':'asc'}`; return obj; },
+      limit: (n) => { _extra+=`&limit=${n}`; return obj; },
+      single: () => { _extra+='&limit=1'; return obj; },
+      eq: (col,val) => { _filters[col]=val; return obj; },
+      gte: (col,val) => { _extra+=`&${col}=gte.${val}`; return obj; },
+      lte: (col,val) => { _extra+=`&${col}=lte.${val}`; return obj; },
+      then: (resolve,reject) => {
+        let url = `${PG_URL}/${table}?select=${_select}`;
+        Object.entries(_filters).forEach(([k,v])=>{ url+=`&${k}=eq.${v}`; });
+        if(_order) url+=`&order=${_order}`;
+        if(_extra) url+=_extra;
+        fetch(url,{headers:pgHeaders}).then(r=>r.json()).then(data=>resolve({data,error:null})).catch(reject);
+      },
+      insert: async (body) => {
+        const r = await fetch(`${PG_URL}/${table}`, {method:'POST',headers:pgHeaders,body:JSON.stringify(body)});
+        const data = r.ok ? await r.json().catch(()=>null) : null;
+        return {data, error:r.ok?null:{message:'insert failed'}};
+      },
+      update: (body) => {
+        return {
+          eq: async (col,val) => {
+            const r = await fetch(`${PG_URL}/${table}?${col}=eq.${val}`, {method:'PATCH',headers:{...pgHeaders,'Prefer':'return=minimal'},body:JSON.stringify(body)});
+            return {data:null,error:r.ok?null:{message:'update failed'}};
+          }
+        };
+      },
+      delete: () => {
+        return {
+          eq: async (col,val) => {
+            const r = await fetch(`${PG_URL}/${table}?${col}=eq.${val}`, {method:'DELETE',headers:pgHeaders});
+            return {data:null,error:r.ok?null:{message:'delete failed'}};
+          }
+        };
+      },
+    };
+    return obj;
+  }
+};
 
 // Supabase helpers
 const DB = {
@@ -18,8 +84,24 @@ const DB = {
   async deleteClockIn(id) { await sb.from('areso_clockins').delete().eq('id',id); },
   async updateClockIn(id,time) { await sb.from('areso_clockins').update({time:new Date(time).toISOString()}).eq('id',id); },
   async getSchedules() { const {data}=await sb.from('areso_schedules').select('*').order('shift_index'); const scheds={};(data||[]).forEach(s=>{const key=s.employee_id+"_"+s.date_key;if(!scheds[key])scheds[key]=[];scheds[key].push({id:s.id,empId:s.employee_id,start:s.start_time,end:s.end_time,shiftIndex:s.shift_index});});return scheds; },
-  async setSchedule(empId,dateKey,start,end,shiftIndex=0) { const {data:existing}=await sb.from('areso_schedules').select('id').eq('employee_id',empId).eq('date_key',dateKey).eq('shift_index',shiftIndex); if(existing&&existing.length>0){await sb.from('areso_schedules').update({start_time:start,end_time:end}).eq('id',existing[0].id);}else{await sb.from('areso_schedules').insert({employee_id:empId,date_key:dateKey,start_time:start,end_time:end,shift_index:shiftIndex});} },
-  async deleteSchedule(empId,dateKey,shiftIndex=null) { const q=sb.from('areso_schedules').delete().eq('employee_id',empId).eq('date_key',dateKey); if(shiftIndex!==null)await q.eq('shift_index',shiftIndex);else await q; },
+  async setSchedule(empId,dateKey,start,end,shiftIndex=0) {
+    const existing = await pgSelect('areso_schedules',{employee_id:empId,date_key:dateKey,shift_index:shiftIndex});
+    if(existing&&existing.length>0){
+      await pgFetch('areso_schedules','PATCH',{id:existing[0].id},{start_time:start,end_time:end});
+    }else{
+      await pgFetch('areso_schedules','POST',{},{employee_id:empId,date_key:dateKey,start_time:start,end_time:end,shift_index:shiftIndex});
+    }
+  },
+  async deleteSchedule(empId,dateKey,shiftIndex=null) {
+    if(shiftIndex!==null){
+      const existing = await pgSelect('areso_schedules',{employee_id:empId,date_key:dateKey,shift_index:shiftIndex});
+      if(existing&&existing.length>0) await pgFetch('areso_schedules','DELETE',{id:existing[0].id});
+    } else {
+      // Delete all shifts for this employee+date
+      const existing = await pgSelect('areso_schedules',{employee_id:empId,date_key:dateKey});
+      for(const row of (existing||[])) await pgFetch('areso_schedules','DELETE',{id:row.id});
+    }
+  },
   async getVacations() { const {data}=await sb.from('areso_vacations').select('*').order('id',{ascending:false}); return (data||[]).map(v=>({id:v.id,empId:v.employee_id,start:v.start_date,end:v.end_date,status:v.status,notes:v.notes})); },
   async addVacation(vac) { await sb.from('areso_vacations').insert({employee_id:vac.empId,start_date:vac.start,end_date:vac.end,status:'pending',notes:vac.notes}); },
   async updateVacation(id,status) { await sb.from('areso_vacations').update({status}).eq('id',id); },
@@ -220,10 +302,9 @@ export default function App(){
       setDocuments(docs);
       setAnnouncements(anns);
       setIncidencias(incs);
-      // Load only today's clockins on startup
+      // Load only today's clockins on startup, merge with existing
       const todayRecs=await DB.getClockIns(dateKey(),dateKey());
-      const recs={};todayRecs.forEach(r=>{const dk=dateKey(new Date(r.time));if(!recs[dk])recs[dk]=[];recs[dk].push(r);});
-      setRecords(recs);
+      setRecords(prev=>{const recs={...prev};todayRecs.forEach(r=>{const dk=dateKey(new Date(r.time));if(!recs[dk])recs[dk]=[];if(!recs[dk].find(x=>x.id===r.id))recs[dk].push(r);});return recs;});
       // Auto-close any open shifts older than 14h
       await autoCloseOpenShifts(emps,scheds,recs);
     }catch(e){console.error("Error loading data:",e);}
@@ -567,7 +648,7 @@ export default function App(){
 
       {/* WEEKLY SCHEDULE */}
       {adminTab==="schedule"&&(()=>{
-        const activeEmps=employees.filter(e=>e.active);
+        const activeEmps=employees.filter(e=>e.active&&!e.sickLeave);
         // ── WEEK VIEW ──
         if(scheduleView==="week"){
           const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),full:DAYS[i],num:d.getDate(),month:MONTHS[d.getMonth()]});}
@@ -709,7 +790,7 @@ export default function App(){
         const prevMonth=()=>{const m=month===0?11:month-1;const y=month===0?year-1:year;setCalMonthView(y*100+m);};
         const nextMonth=()=>{const m=month===11?0:month+1;const y=month===11?year+1:year;setCalMonthView(y*100+m);};
         const MONTH_NAMES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-        const activeEmps=employees.filter(e=>e.active);
+        const activeEmps=employees.filter(e=>e.active&&!e.sickLeave);
         const firstDow=new Date(year,month,1).getDay();
         const startDow=firstDow===0?6:firstDow-1;
         const cells=[];
@@ -1086,7 +1167,7 @@ export default function App(){
       const prevMonth=()=>{const m=month===0?11:month-1;const y=month===0?year-1:year;setCalMonthView(y*100+m);};
       const nextMonth=()=>{const m=month===11?0:month+1;const y=month===11?year+1:year;setCalMonthView(y*100+m);};
       const MONTH_NAMES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-      const activeEmps=employees.filter(e=>e.active);
+      const activeEmps=employees.filter(e=>e.active&&!e.sickLeave);
       const firstDow=new Date(year,month,1).getDay();
       const startDow=firstDow===0?6:firstDow-1;
       const cells=[];
