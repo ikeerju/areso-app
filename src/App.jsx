@@ -38,6 +38,7 @@ const sb = {
       eq: (col,val) => { _filters[col]=val; return obj; },
       gte: (col,val) => { _extra+=`&${col}=gte.${val}`; return obj; },
       lte: (col,val) => { _extra+=`&${col}=lte.${val}`; return obj; },
+      lt: (col,val) => { _extra+=`&${col}=lt.${val}`; return obj; },
       then: (resolve,reject) => {
         let url = `${PG_URL}/${table}?select=${_select}`;
         Object.entries(_filters).forEach(([k,v])=>{ url+=`&${k}=eq.${v}`; });
@@ -78,7 +79,7 @@ const DB = {
   async updateEmployee(id,fields) { const dbFields={}; if('active' in fields)dbFields.active=fields.active; if('role' in fields)dbFields.role=fields.role; if('sick_leave' in fields)dbFields.sick_leave=fields.sick_leave; await sb.from('areso_employees').update(dbFields).eq('id',id); },
   async updatePin(id,newPin) { await sb.from('areso_employees').update({password:newPin}).eq('id',id); },
   async updateEmployeeProfile(id,f) { await sb.from('areso_employees').update({name:f.name,position:f.position,phone:f.phone,birthday:f.birthday||null,email:f.email}).eq('id',id); },
-  async getClockIns(dateFrom,dateTo) { const {data}=await sb.from('areso_clockins').select('id,employee_id,type,time').gte('time',dateFrom).lte('time',dateTo+'T23:59:59').order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:null})); },
+  async getClockIns(dateFrom,dateTo) { const {data}=await sb.from('areso_clockins').select('id,employee_id,type,time').gte('time',pk(dateFrom).toISOString()).lt('time',(()=>{const e=pk(dateTo);e.setDate(e.getDate()+1);return e.toISOString();})()).order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:null})); },
   async getAllClockIns() { const from=new Date();from.setMonth(from.getMonth()-12);const {data}=await sb.from('areso_clockins').select('id,employee_id,type,time').gte('time',from.toISOString()).order('time'); return (data||[]).map(r=>({id:r.id,empId:r.employee_id,type:r.type,time:new Date(r.time).getTime(),photo:null})); },
   async addClockIn(rec) { await sb.from('areso_clockins').insert({employee_id:rec.empId,type:rec.type,time:new Date(rec.time).toISOString(),photo_url:null}); },
   async deleteClockIn(id) { await sb.from('areso_clockins').delete().eq('id',id); },
@@ -124,9 +125,10 @@ const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"
 const MONTHS=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const ADMIN_PIN="0000";
 const fmtTime=d=>new Date(d).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"});
-const fmtDate=d=>new Date(d).toLocaleDateString("es-ES",{day:"numeric",month:"short"});
-const fmtDateLong=d=>new Date(d).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"short"});
-const dateKey=(d=new Date())=>d.toISOString().split("T")[0];
+const fmtDate=d=>pk(d).toLocaleDateString("es-ES",{day:"numeric",month:"short"});
+const fmtDateLong=d=>pk(d).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"short"});
+const dateKey=(d=new Date())=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const pk=k=>{if(typeof k==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(k)){const [y,m,d]=k.split("-").map(Number);return new Date(y,m-1,d);}return new Date(k);};
 const fmtDur=ms=>{if(!ms||ms<0)return"0h 00m";const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000);return h+"h "+String(m).padStart(2,"0")+"m";};
 const getWorked=(records,eid,dk)=>{const r=(records[dk]||[]).filter(x=>x.empId===eid).sort((a,b)=>a.time-b.time);let t=0,li=null;for(const x of r){if(x.type==="in")li=x.time;else if(x.type==="out"&&li){t+=x.time-li;li=null;}}if(li)t+=Date.now()-li;return t;};
 const getStatus=(records,eid)=>{const r=(records[dateKey()]||[]).filter(x=>x.empId===eid).sort((a,b)=>a.time-b.time);if(!r.length)return"out";return r[r.length-1].type==="in"?"in":"out";};
@@ -193,23 +195,23 @@ const CSS=<style>{`@import url('https://fonts.googleapis.com/css2?family=Outfit:
 function generateReport(employees,records,schedules,vacations,documents,f,t){
   let csv="\ufeffINFORME ARESO\nPeriodo: "+f+" a "+t+"\nGenerado: "+new Date().toLocaleString("es-ES")+"\n\n";
   csv+="RESUMEN POR EMPLEADO\nNombre,Puesto,Estado,Días,Horas totales,Media\n";
-  employees.filter(e=>e.active).forEach(emp=>{let ms=0,days=0;const d1=new Date(f),d2=new Date(t);for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){const w=getWorked(records,emp.id,dateKey(d));if(w>0){ms+=w;days++;}}const estado=emp.sickLeave?"DE BAJA":"Activo";csv+=`${emp.name},${emp.position||"—"},${estado},${days},${fmtDur(ms)},${days?fmtDur(ms/days):"—"}\n`;});
+  employees.filter(e=>e.active).forEach(emp=>{let ms=0,days=0;const d1=pk(f),d2=pk(t);for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){const w=getWorked(records,emp.id,dateKey(d));if(w>0){ms+=w;days++;}}const estado=emp.sickLeave?"DE BAJA":"Activo";csv+=`${emp.name},${emp.position||"—"},${estado},${days},${fmtDur(ms)},${days?fmtDur(ms/days):"—"}\n`;});
   csv+="\nFICHAJES\nFecha,Hora,Empleado,Tipo\n";Object.keys(records).filter(d=>d>=f&&d<=t).sort().forEach(d=>(records[d]||[]).sort((a,b)=>a.time-b.time).forEach(r=>{const emp=employees.find(e=>e.id===r.empId);csv+=`${d},${fmtTime(r.time)},${emp?.name||"?"},${r.type==="in"?"Entrada":"Salida"}\n`;}));
   csv+="\nHORARIOS\nEmpleado,Día,Entrada,Salida\n";employees.filter(e=>e.active).forEach(emp=>DAYS.forEach((day,i)=>{const s=schedules[emp.id+"_"+i];if(s)csv+=`${emp.name},${day},${s.start},${s.end}\n`;}));
   csv+="\nVACACIONES\nEmpleado,Desde,Hasta,Estado\n";vacations.forEach(v=>{const emp=employees.find(e=>e.id===v.empId);csv+=`${emp?.name},${v.start},${v.end},${v.status}\n`;});
   return csv;
 }
 
-function HorariosEmpleado({schedules,user,calWeekStart2,setCalWeekStart2,goHome}){
-  const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart2);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),full:DAYS[i],num:d.getDate()});}
-  const shiftWk=(dir)=>{const d=new Date(calWeekStart2);d.setDate(d.getDate()+(dir*7));setCalWeekStart2(dateKey(d));};
+function HorariosEmpleado({schedules,vacations=[],user,calWeekStart2,setCalWeekStart2,goHome}){
+  const weekDays=[];for(let i=0;i<7;i++){const d=pk(calWeekStart2);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),full:DAYS[i],num:d.getDate()});}
+  const shiftWk=(dir)=>{const d=pk(calWeekStart2);d.setDate(d.getDate()+(dir*7));setCalWeekStart2(dateKey(d));};
   const col=getAvatarColor(user.id);
   return(<div style={{padding:"16px 16px 80px",display:"flex",flexDirection:"column",gap:14}}>
     <button onClick={goHome} style={ss.back}>← Menú</button>
     <div style={{fontSize:22,fontWeight:700}}>Mi horario</div>
     <div style={{display:"flex",alignItems:"center",gap:8}}>
       <button onClick={()=>shiftWk(-1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>←</button>
-      <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:13,fontWeight:700}}>{weekDays[0].num} {MONTHS[new Date(weekDays[0].date).getMonth()]} — {weekDays[6].num} {MONTHS[new Date(weekDays[6].date).getMonth()]}</div>
+      <div style={{flex:1,textAlign:"center",fontFamily:font,fontSize:13,fontWeight:700}}>{weekDays[0].num} {MONTHS[pk(weekDays[0].date).getMonth()]} — {weekDays[6].num} {MONTHS[pk(weekDays[6].date).getMonth()]}</div>
       <button onClick={()=>shiftWk(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px"}}>→</button>
     </div>
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -217,10 +219,11 @@ function HorariosEmpleado({schedules,user,calWeekStart2,setCalWeekStart2,goHome}
         const raw=schedules[user.id+"_"+d.date];
         const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
         const isToday=d.date===dateKey();
+        const onVac=vacations.find(v=>v.empId===user.id&&v.status==="approved"&&v.start<=d.date&&v.end>=d.date);
         return(<div key={d.date} style={{background:C.card,borderRadius:14,padding:"14px 18px",border:`1px solid ${isToday?C.accent+"55":C.border}`,display:"flex",alignItems:"center",gap:14,background:isToday?C.accent+"0d":C.card}}>
           <div style={{minWidth:80}}>
             <div style={{fontFamily:font,fontSize:13,fontWeight:700,color:isToday?C.accent:C.text}}>{d.full}</div>
-            <div style={{fontFamily:font,fontSize:11,color:C.muted}}>{d.num} {MONTHS[new Date(d.date).getMonth()]}</div>
+            <div style={{fontFamily:font,fontSize:11,color:C.muted}}>{d.num} {MONTHS[pk(d.date).getMonth()]}</div>
           </div>
           {shifts.length>0?<div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}>
             {shifts.map((s,si)=><div key={si} style={{background:col+"18",border:`2px solid ${col}`,borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
@@ -229,7 +232,7 @@ function HorariosEmpleado({schedules,user,calWeekStart2,setCalWeekStart2,goHome}
               <span style={{fontFamily:font,fontSize:15,fontWeight:700,color:col}}>{s.end}</span>
               {shifts.length>1&&<span style={{fontFamily:font,fontSize:9,color:col,background:col+"22",borderRadius:4,padding:"1px 5px"}}>T{si+1}</span>}
             </div>)}
-          </div>:<div style={{flex:1,fontFamily:font,fontSize:13,color:C.dim,textAlign:"center"}}>Libre</div>}
+          </div>:onVac?<div style={{flex:1,background:"#f59e0b22",border:"2px solid #f59e0b",borderRadius:12,padding:"10px 14px",textAlign:"center",fontFamily:font,fontSize:14,fontWeight:700,color:"#b45309"}}>🏖 Vacaciones</div>:<div style={{flex:1,fontFamily:font,fontSize:13,color:C.dim,textAlign:"center"}}>Libre</div>}
           {isToday&&<div style={{fontFamily:font,fontSize:9,color:C.accent,fontWeight:700,background:C.accent+"18",padding:"3px 8px",borderRadius:6}}>HOY</div>}
         </div>);
       })}
@@ -335,7 +338,7 @@ export default function App(){
       const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
       const lastShift=shifts[shifts.length-1];
       let closeTime;
-      if(lastShift?.end){const [h,m]=lastShift.end.split(":").map(Number);const t=new Date(dateKey());t.setHours(h,m,0,0);closeTime=t.getTime();if(closeTime<=lastRec.time)closeTime=lastRec.time+8*3600000;}
+      if(lastShift?.end){const [h,m]=lastShift.end.split(":").map(Number);const t=pk(dateKey());t.setHours(h,m,0,0);closeTime=t.getTime();if(closeTime<=lastRec.time)closeTime=lastRec.time+8*3600000;}
       else{closeTime=lastRec.time+8*3600000;}
       if(closeTime>now)closeTime=now;
       await DB.addClockIn({empId:emp.id,type:"out",time:closeTime,photo:null});
@@ -493,7 +496,7 @@ export default function App(){
         <button onClick={()=>loadData()} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.accent,cursor:"pointer",fontFamily:font,fontSize:11}}>↻ Actualizar</button>
         <button onClick={()=>{setView("login");setAdminPin("");}} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${C.border}`,background:C.card,color:C.muted,cursor:"pointer",fontFamily:font,fontSize:11}}>Salir</button>
       </div></div>
-      <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:16}}>{tabs.map(t=><button key={t.id} onClick={()=>{setAdminTab(t.id);setAddShift(null);setConfirmDelete(null);if(t.id==="records"){const d=new Date();d.setDate(d.getDate()-7);loadClockIns(dateKey(d),dateKey());}if(t.id==="export"){const d=new Date();d.setMonth(d.getMonth()-1);loadClockIns(dateKey(d),dateKey());}if(t.id==="audit"){DB.getAudit().then(setAuditLog).catch(()=>setAuditLog([]));}}} style={{padding:"10px 18px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:font,fontSize:13,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#fff":C.muted,whiteSpace:"nowrap"}}>{t.l}</button>)}</div>
+      <div style={{display:"flex",gap:4,overflowX:"auto",marginBottom:16,WebkitOverflowScrolling:"touch",scrollbarWidth:"none",msOverflowStyle:"none",marginLeft:-32,marginRight:-32,paddingLeft:32,paddingRight:32}}>{tabs.map(t=><button key={t.id} onClick={()=>{setAdminTab(t.id);setAddShift(null);setConfirmDelete(null);if(t.id==="records"){const d=new Date();d.setDate(d.getDate()-7);loadClockIns(dateKey(d),dateKey());}if(t.id==="export"){const d=new Date();d.setMonth(d.getMonth()-1);loadClockIns(dateKey(d),dateKey());}if(t.id==="audit"){DB.getAudit().then(setAuditLog).catch(()=>setAuditLog([]));}}} style={{padding:"10px 16px",borderRadius:10,border:"none",cursor:"pointer",fontFamily:font,fontSize:13,fontWeight:600,background:adminTab===t.id?C.accent:"transparent",color:adminTab===t.id?"#fff":C.muted,whiteSpace:"nowrap",flexShrink:0}}>{t.l}</button>)}</div>
 
       {/* LIVE */}
       {adminTab==="live"&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -539,7 +542,7 @@ export default function App(){
             const time=document.getElementById("rec-time").value;
             if(!empId||!date||!time)return flash("Rellena todos los campos",false);
             const [h,m]=time.split(":");
-            const dt=new Date(date);dt.setHours(+h,+m,0,0);
+            const dt=pk(date);dt.setHours(+h,+m,0,0);
             const rec={empId,type,time:dt.getTime(),photo:null};
             await DB.addClockIn(rec);
             const empName=employees.find(e=>e.id===empId)?.name||"?";
@@ -549,7 +552,7 @@ export default function App(){
             flash(`Fichaje añadido ✓`);loadData();
           }} style={ss.btn(C.accent,"#fff")}>+ Añadir fichaje</button>
         </div>
-        <div style={{display:"flex",gap:8}}><button onClick={()=>{const d=new Date(filterDate);d.setDate(d.getDate()-1);setFilterDate(dateKey(d));}} style={{...ss.btn(C.card,C.muted),width:44,border:`1px solid ${C.border}`}}>←</button><input type="date" value={filterDate} onChange={e=>setFilterDate(e.target.value)} style={{...ss.input,flex:1}}/><button onClick={()=>{const d=new Date(filterDate);d.setDate(d.getDate()+1);setFilterDate(dateKey(d));}} style={{...ss.btn(C.card,C.muted),width:44,border:`1px solid ${C.border}`}}>→</button></div>
+        <div style={{display:"flex",gap:8}}><button onClick={()=>{const d=pk(filterDate);d.setDate(d.getDate()-1);setFilterDate(dateKey(d));}} style={{...ss.btn(C.card,C.muted),width:44,border:`1px solid ${C.border}`}}>←</button><input type="date" value={filterDate} onChange={e=>setFilterDate(e.target.value)} style={{...ss.input,flex:1}}/><button onClick={()=>{const d=pk(filterDate);d.setDate(d.getDate()+1);setFilterDate(dateKey(d));}} style={{...ss.btn(C.card,C.muted),width:44,border:`1px solid ${C.border}`}}>→</button></div>
         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{employees.filter(e=>e.active).map(emp=>{const w=getWorked(records,emp.id,filterDate);if(!w&&!(records[filterDate]||[]).some(r=>r.empId===emp.id))return null;return<div key={emp.id} style={{...ss.card,padding:"5px 10px",fontFamily:font,fontSize:11}}>{emp.name.split(" ")[0]} <span style={{color:C.accent,marginLeft:4}}>{fmtDur(w)}</span></div>;})}</div>
         {(()=>{
           const dayRecs=(records[filterDate]||[]).sort((a,b)=>a.time-b.time);
@@ -652,8 +655,8 @@ export default function App(){
         const activeEmps=employees.filter(e=>e.active&&!e.sickLeave);
         // ── WEEK VIEW ──
         if(scheduleView==="week"){
-          const weekDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),full:DAYS[i],num:d.getDate(),month:MONTHS[d.getMonth()]});}
-          const shiftWeek=(dir)=>{const d=new Date(calWeekStart);d.setDate(d.getDate()+(dir*7));setCalWeekStart(dateKey(d));};
+          const weekDays=[];for(let i=0;i<7;i++){const d=pk(calWeekStart);d.setDate(d.getDate()+i);weekDays.push({date:dateKey(d),label:DAYS[i].slice(0,3),full:DAYS[i],num:d.getDate(),month:MONTHS[d.getMonth()]});}
+          const shiftWeek=(dir)=>{const d=pk(calWeekStart);d.setDate(d.getDate()+(dir*7));setCalWeekStart(dateKey(d));};
           return(<div style={{display:"flex",flexDirection:"column",gap:14}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <button onClick={()=>shiftWeek(-1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>←</button>
@@ -661,13 +664,13 @@ export default function App(){
               <button onClick={()=>shiftWeek(1)} style={{...ss.btn(C.card,C.muted),width:40,border:`1px solid ${C.border}`,padding:"8px",flexShrink:0}}>→</button>
               <button onClick={()=>{const n=new Date();const d=n.getDay()||7;n.setDate(n.getDate()-(d-1));setCalWeekStart(dateKey(n));}} style={{...ss.btn(C.cardLight,C.accent),width:"auto",border:`1px solid ${C.border}`,padding:"8px 10px",fontSize:11,flexShrink:0}}>Hoy</button>
               <button onClick={async()=>{
-                const wDays=[];for(let i=0;i<7;i++){const d=new Date(calWeekStart);d.setDate(d.getDate()+i);wDays.push(dateKey(d));}
-                const y=new Date(calWeekStart).getFullYear();const m=new Date(calWeekStart).getMonth();
+                const wDays=[];for(let i=0;i<7;i++){const d=pk(calWeekStart);d.setDate(d.getDate()+i);wDays.push(dateKey(d));}
+                const y=pk(calWeekStart).getFullYear();const m=pk(calWeekStart).getMonth();
                 const dim=new Date(y,m+1,0).getDate();const ns={...schedules};let count=0;
                 for(const emp of activeEmps){for(let d=1;d<=dim;d++){
                   const cdk=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-                  const dow=new Date(cdk).getDay();const dowIdx=dow===0?6:dow-1;
-                  const srcDk=wDays[dowIdx];if(!srcDk)continue;
+                  const dow=pk(cdk).getDay();const dowIdx=dow===0?6:dow-1;
+                  const srcDk=wDays[dowIdx];if(!srcDk)continue;if(vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=cdk&&v.end>=cdk))continue;
                   const raw=schedules[emp.id+"_"+srcDk];
                   const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                   if(shifts.length>0){await DB.deleteSchedule(emp.id,cdk);for(let si=0;si<shifts.length;si++){await DB.setSchedule(emp.id,cdk,shifts[si].start,shifts[si].end,si);}ns[emp.id+"_"+cdk]=shifts;count++;}
@@ -679,9 +682,9 @@ export default function App(){
             {activeEmps.map(emp=>{
               const col=getAvatarColor(emp.id);
               return(<div key={emp.id} style={{...ss.card,padding:0,overflow:"hidden"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:`1px solid ${C.border}`,background:C.cardLight}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderBottom:`1px solid ${C.border}`,background:C.cardLight,flexWrap:"wrap"}}>
                   <div style={ss.avatar(col,32)}>{emp.name.split(" ").map(n=>n[0]).join("").slice(0,2)}</div>
-                  <div style={{flex:1}}><div style={{fontFamily:font,fontSize:14,fontWeight:700}}>{emp.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>{emp.position||"—"}</div></div>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontFamily:font,fontSize:14,fontWeight:700}}>{emp.name.split(" ")[0]}</div><div style={{fontFamily:font,fontSize:11,color:C.muted}}>{emp.position||"—"}</div></div>
                   <button onClick={()=>{
                     const data={};
                     weekDays.forEach((d,i)=>{
@@ -689,21 +692,10 @@ export default function App(){
                       const shifts=Array.isArray(raw)?raw:raw?.start?[raw]:[];
                       if(shifts.length>0)data[i]=shifts;
                     });
+                    if(Object.keys(data).length===0)return flash("No hay turnos que copiar",false);
                     setCopiedWeek({empId:emp.id,empName:emp.name.split(" ")[0],data});
-                    flash(`Semana de ${emp.name.split(" ")[0]} copiada ✓`);
-                  }} style={{fontFamily:font,fontSize:10,padding:"4px 10px",borderRadius:7,border:`1px solid ${C.border}`,background:C.cardLight,color:C.purple,cursor:"pointer",fontWeight:700}}>📋 Copiar</button>
-                  {copiedWeek&&<button onClick={async()=>{
-                    const ns={...schedules};let count=0;
-                    for(const [dayOffset,shifts] of Object.entries(copiedWeek.data)){
-                      const targetDay=weekDays[parseInt(dayOffset)];
-                      if(!targetDay)continue;
-                      await DB.deleteSchedule(emp.id,targetDay.date);
-                      for(let si=0;si<shifts.length;si++){await DB.setSchedule(emp.id,targetDay.date,shifts[si].start,shifts[si].end,si);}
-                      ns[emp.id+"_"+targetDay.date]=shifts;count++;
-                    }
-                    setSchedules(ns);
-                    flash(`Pegado en ${emp.name.split(" ")[0]} ✓`);
-                  }} style={{fontFamily:font,fontSize:10,padding:"4px 10px",borderRadius:7,border:"none",background:C.purple,color:"#fff",cursor:"pointer",fontWeight:700}}>📋 Pegar</button>}
+                    flash(`✓ Semana de ${emp.name.split(" ")[0]} copiada`);
+                  }} style={{fontFamily:font,fontSize:10,padding:"4px 10px",borderRadius:7,border:`1px solid ${C.purple}44`,background:copiedWeek?.empId===emp.id?C.purple+"22":"transparent",color:C.purple,cursor:"pointer",fontWeight:700,flexShrink:0}}>📋 {copiedWeek?.empId===emp.id?"Copiado":"Copiar"}</button>
                 </div>
                 <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(7,minmax(56px,1fr))",minWidth:392}}>
@@ -716,6 +708,7 @@ export default function App(){
                           <div style={{fontFamily:font,fontSize:10,fontWeight:600,color:isToday?C.accent:C.muted}}>{d.label}</div>
                           <div style={{fontFamily:font,fontSize:13,fontWeight:700,color:isToday?C.accent:C.text}}>{d.num}</div>
                         </div>
+                        {vacations.find(v=>v.empId===emp.id&&v.status==="approved"&&v.start<=d.date&&v.end>=d.date)&&<div style={{background:"#f59e0b22",border:"2px solid #f59e0b",borderRadius:6,padding:"3px 2px",width:"94%",textAlign:"center"}}><div style={{fontSize:13}}>🏖</div><div style={{fontFamily:font,fontSize:9,fontWeight:700,color:"#b45309"}}>Vacaciones</div></div>}
                         {shifts.map((s,si)=><div key={si} onClick={()=>setConfirmDelete({empId:emp.id,dayKey:d.date,shiftIdx:si})} style={{background:col+"22",border:`2px solid ${col}`,borderRadius:6,padding:"3px 4px",width:"94%",cursor:"pointer",textAlign:"center"}}>
                           <div style={{fontFamily:font,fontSize:10,fontWeight:700,color:col}}>{s.start}</div>
                           <div style={{fontFamily:font,fontSize:9,color:col+"aa"}}>→{s.end}</div>
@@ -884,7 +877,7 @@ export default function App(){
       {addShift&&(()=>{
         const emp=employees.find(e=>e.id===addShift.empId);
         const col=getAvatarColor(addShift.empId);
-        const fmtDay=(d)=>new Date(d).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
+        const fmtDay=(d)=>pk(d).toLocaleDateString("es-ES",{weekday:"long",day:"numeric",month:"long"});
         const existing=schedules[addShift.empId+"_"+addShift.dayKey];
         const existingShifts=Array.isArray(existing)?existing:existing?.start?[existing]:[];
         const isSplit=existingShifts.length>0;
@@ -924,8 +917,8 @@ export default function App(){
                 setAddShift(null);flash(isSplit?"Turno partido añadido ✓":"Turno guardado ✓");
               }} style={{...ss.btn(col,"#fff"),borderRadius:12,marginBottom:8,fontSize:14,fontWeight:700,padding:"13px"}}>{isSplit?"+ Añadir turno partido":"✓ Guardar este día"}</button>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                <button onClick={async()=>{const ns={...schedules};const cd=new Date(addShift.dayKey);const dw=cd.getDay()||7;const mon=new Date(cd);mon.setDate(cd.getDate()-(dw-1));for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const cdk=dateKey(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);ns[addShift.empId+"_"+cdk]={start:shiftForm.start,end:shiftForm.end};}setSchedules(ns);setAddShift(null);flash("Semana aplicada ✓");}} style={{...ss.btn(C.cardLight,C.green),border:`1.5px solid ${C.green}44`,borderRadius:10,padding:"10px",fontSize:12}}>📅 Esta semana</button>
-                <button onClick={async()=>{const ns={...schedules};const y=new Date(addShift.dayKey).getFullYear();const m=new Date(addShift.dayKey).getMonth();const dim=new Date(y,m+1,0).getDate();for(let d=1;d<=dim;d++){const cdk=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);ns[addShift.empId+"_"+cdk]={start:shiftForm.start,end:shiftForm.end};}setSchedules(ns);setAddShift(null);flash("Mes aplicado ✓");}} style={{...ss.btn(C.cardLight,C.blue),border:`1.5px solid ${C.blue}44`,borderRadius:10,padding:"10px",fontSize:12}}>📆 Todo el mes</button>
+                <button onClick={async()=>{const ns={...schedules};const cd=pk(addShift.dayKey);const dw=cd.getDay()||7;const mon=new Date(cd);mon.setDate(cd.getDate()-(dw-1));for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const cdk=dateKey(d);await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);ns[addShift.empId+"_"+cdk]={start:shiftForm.start,end:shiftForm.end};}setSchedules(ns);setAddShift(null);flash("Semana aplicada ✓");}} style={{...ss.btn(C.cardLight,C.green),border:`1.5px solid ${C.green}44`,borderRadius:10,padding:"10px",fontSize:12}}>📅 Esta semana</button>
+                <button onClick={async()=>{const ns={...schedules};const y=pk(addShift.dayKey).getFullYear();const m=pk(addShift.dayKey).getMonth();const dim=new Date(y,m+1,0).getDate();for(let d=1;d<=dim;d++){const cdk=`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;await DB.setSchedule(addShift.empId,cdk,shiftForm.start,shiftForm.end);ns[addShift.empId+"_"+cdk]={start:shiftForm.start,end:shiftForm.end};}setSchedules(ns);setAddShift(null);flash("Mes aplicado ✓");}} style={{...ss.btn(C.cardLight,C.blue),border:`1.5px solid ${C.blue}44`,borderRadius:10,padding:"10px",fontSize:12}}>📆 Todo el mes</button>
               </div>
             </div>
           </div>
@@ -1092,7 +1085,7 @@ export default function App(){
             <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:8}}>
               {employees.filter(e=>e.active).map(emp=>{
                 let ms=0,days=0;
-                const d1=new Date(exportFrom),d2=new Date(exportTo);
+                const d1=pk(exportFrom),d2=pk(exportTo);
                 for(let d=new Date(d1);d<=d2;d.setDate(d.getDate()+1)){const w=getWorked(records,emp.id,dateKey(d));if(w>0){ms+=w;days++;}}
                 if(!ms)return null;
                 const col=getAvatarColor(emp.id);
@@ -1181,7 +1174,7 @@ export default function App(){
 
 
     {/* HORARIOS empleado */}
-    {sub==="horarios"&&<HorariosEmpleado schedules={schedules} user={user} calWeekStart2={calWeekStart2} setCalWeekStart2={setCalWeekStart2} goHome={goHome}/>}
+    {sub==="horarios"&&<HorariosEmpleado schedules={schedules} vacations={vacations} user={user} calWeekStart2={calWeekStart2} setCalWeekStart2={setCalWeekStart2} goHome={goHome}/>}
 
     {/* CALENDARIO EQUIPO empleado */}
     {sub==="calendario"&&(()=>{
@@ -1331,7 +1324,7 @@ export default function App(){
         let ms=0,li=null;
         byDate[dk].sort((a,b)=>a.time-b.time).forEach(r=>{if(r.type==="in")li=r.time;else if(r.type==="out"&&li){ms+=r.time-li;li=null;}});
         if(li)ms+=Date.now()-li;
-        const d=new Date(dk);
+        const d=pk(dk);
         if(d>=weekStart)weekMs+=ms;
         if(d>=monthStart)monthMs+=ms;
       });
@@ -1355,7 +1348,7 @@ export default function App(){
           let ms=0,li=null;recs.forEach(r=>{if(r.type==="in")li=r.time;else if(r.type==="out"&&li){ms+=r.time-li;li=null;}});if(li)ms+=Date.now()-li;
           return(<div key={dk} style={ss.card}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-              <div style={{fontFamily:font,fontSize:13,fontWeight:700,textTransform:"capitalize"}}>{fmtDateLong(new Date(dk))}</div>
+              <div style={{fontFamily:font,fontSize:13,fontWeight:700,textTransform:"capitalize"}}>{fmtDateLong(pk(dk))}</div>
               {ms>0&&<div style={{fontFamily:font,fontSize:12,fontWeight:700,color:C.accent}}>{fmtDur(ms)}</div>}
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
